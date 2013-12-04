@@ -1,13 +1,17 @@
 ## mfcc.jl
 ## (c) 2013 David A. van Leeuwen
 
-module Features
+## Recoded from / inspired by melfcc from Dan Ellis's rastamat package. 
 
-export mfcc, deltas, warp, sdc
+module MFCCs
+
+export mfcc, deltas, warp, sdc, znorm, znorm!
 
 using Rasta
 using SignalProcessing
-using Misc
+
+nrow(x) = size(x,1)
+ncol(x) = size(x,2)
 
 ## This function accepts a vector of sample values, below we will generalize to arrays, 
 ## i.e., multichannel data
@@ -72,6 +76,9 @@ function deltas{T<:FloatingPoint}(x::Array{T}, w::Int=9)
 end
 
 
+import Base.Sort.sortperm
+sortperm(a::Array,dim::Int) = mapslices(sortperm, a, dim)
+
 function warp{T<:FloatingPoint}(x::Array{T}, w=399)
     l = nrow(x)
     wl = min(w, l)
@@ -97,6 +104,9 @@ function warp{T<:FloatingPoint}(x::Array{T}, w=399)
     end
     return erfinvtab[rank]        
 end
+
+znorm(x::Array, dim::Int=1) = broadcast(/, broadcast(-, x, mean(x, dim)), std(x, dim))
+znorm!(x::Array, dim::Int=1) = broadcast!(/, x, broadcast!(-, x, x, mean(x, dim)), std(x, dim))
 
 function sdc{T<:FloatingPoint}(x::Array{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7)
     (nx, nfea) = size(x)
