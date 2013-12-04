@@ -19,7 +19,7 @@ ncol(x) = size(x,2)
 ## Defaults here are HTK parameters, this is contrary to melfcc
 function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::FloatingPoint=16000.0; wintime=0.025, steptime=0.01, numcep=13, 
               lifterexp=-22, sumpower=false, preemph=0.97, dither=false, minfreq=0.0, maxfreq=sr/2,
-              nbands=20, bwidth=1.0, dcttype=3, fbtype="htkmel", usecmp=false, modelorder=0)
+              nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel, usecmp=false, modelorder=0)
     if (preemph!=0) 
         x |= Filter([1., -preemph])
     end
@@ -53,11 +53,11 @@ mfcc{T<:FloatingPoint}(x::Array{T}, sr::FloatingPoint=16000.0...) = @parallel (t
 ## default feature configurations, :rasta, :htk, :spkid_toolkit, :wbspeaker
 function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::FloatingPoint, defaults::Symbol) 
     if defaults==:rasta
-        mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=40, dcttype=2, fbtype="mel")
+        mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=40, dcttype=2, fbtype=:mel)
     elseif defaults==:spkid_toolkit
-        mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=30, dcttype=2, fbtype="mel", minfreq=130., maxfreq=3900., numcep=20)
+        mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=30, dcttype=2, fbtype=:mel, minfreq=130., maxfreq=3900., numcep=20)
     elseif defaults == :wbspeaker
-        mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=63, dcttype=2, fbtype="mel", minfreq=62.5, maxfreq=7937.5, numcep=20)
+        mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=63, dcttype=2, fbtype=:mel, minfreq=62.5, maxfreq=7937.5, numcep=20)
     elseif defaults==:htk
         mfcc(x, sr)
     else
