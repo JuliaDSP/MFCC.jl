@@ -61,7 +61,7 @@ function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::FloatingPoint, defaults::Symbo
     elseif defaults==:htk
         mfcc(x, sr)
     else
-        error("Unknown set of defaults ", fefaults)
+        error("Unknown set of defaults ", defaults)
     end
 end
 
