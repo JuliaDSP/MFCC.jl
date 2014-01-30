@@ -1,11 +1,7 @@
-## mfcc.jl
-## (c) 2013 David A. van Leeuwen
+## mfccs.jl
+## (c) 2013--2014 David A. van Leeuwen
 
 ## Recoded from / inspired by melfcc from Dan Ellis's rastamat package. 
-
-module MFCCs
-
-export mfcc, deltas, warp, sdc, znorm, znorm!
 
 using Rasta
 using SignalProcessing
@@ -119,4 +115,3 @@ function sdc{T<:FloatingPoint}(x::Array{T}, n::Int=7, d::Int=1, p::Int=3, k::Int
     return y
 end
 
-end
