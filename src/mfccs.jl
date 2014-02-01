@@ -107,7 +107,7 @@ znorm!(x::Array, dim::Int=1) = broadcast!(/, x, broadcast!(-, x, x, mean(x, dim)
 function sdc{T<:FloatingPoint}(x::Array{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7)
     (nx, nfea) = size(x)
     @assert n <= nfea
-    xx = vcat(deltas(x[:,1:n], 2d+1), zeros(typeof(x[1]), (k-1)*p, n))
+    xx = vcat(deltas(x[:,1:n], 2d+1), zeros(eltype(x), (k-1)*p, n))
     y = zeros(eltype(x), nx, n*k)
     for (dt,offset) = zip(0:p:p*k-1,0:n:n*k-1)
         y[:,offset+(1:n)] = xx[dt+(1:nx),:]
