@@ -79,7 +79,7 @@ function warp{T<:FloatingPoint}(x::Array{T}, w=399)
     l = nrow(x)
     wl = min(w, l)
     hw = iround((wl+1)/2)
-    erfinvtab = sqrt(2)*erfinv([1:wl]/hw - 1)
+    erfinvtab = sqrt(2)*erfinv([1:wl]/hw .- 1)
     rank = zeros(Int, size(x))
     if l<w
         index = sortperm(x, 1)
