@@ -95,7 +95,7 @@ function warp{T<:FloatingPoint}(x::Array{T}, w=399)
                 e -= d
                 s -= d
             end
-            rank[i,:] = 1+sum(broadcast(.>, x[i,:], x[s:e,:]), 1) # sum over columns
+            rank[i,:] = 1 .+ sum(broadcast(.>, x[i,:], x[s:e,:]), 1)  # sum over columns
         end
     end
     return erfinvtab[rank]        
