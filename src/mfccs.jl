@@ -75,7 +75,7 @@ end
 import Base.Sort.sortperm
 sortperm(a::Array,dim::Int) = mapslices(sortperm, a, dim)
 
-function warp{T<:FloatingPoint}(x::Array{T}, w=399)
+function warp{T<:Real}(x::Array{T}, w=399)
     l = nrow(x)
     wl = min(w, l)
     hw = (wl+1)/2
