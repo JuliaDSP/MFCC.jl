@@ -78,7 +78,7 @@ sortperm(a::Array,dim::Int) = mapslices(sortperm, a, dim)
 function warp{T<:FloatingPoint}(x::Array{T}, w=399)
     l = nrow(x)
     wl = min(w, l)
-    hw = iround((wl+1)/2)
+    hw = (wl+1)/2
     erfinvtab = sqrt(2)*erfinv([1:wl]/hw .- 1)
     rank = zeros(Int, size(x))
     if l<w
@@ -88,7 +88,7 @@ function warp{T<:FloatingPoint}(x::Array{T}, w=399)
         end
     else
         for i=1:l
-            s=max(1,i-hw+1)
+            s=max(1,i-iround(hw)+1)
             e=s+w-1
             if (e>l) 
                 d = e-l
@@ -98,7 +98,7 @@ function warp{T<:FloatingPoint}(x::Array{T}, w=399)
             rank[i,:] = 1 .+ sum(broadcast(.>, x[i,:], x[s:e,:]), 1)  # sum over columns
         end
     end
-    return erfinvtab[rank]        
+    return erfinvtab[rank]q
 end
 
 znorm(x::Array, dim::Int=1) = broadcast(/, broadcast(-, x, mean(x, dim)), std(x, dim))
