@@ -64,11 +64,15 @@ end
 ## our features run down with time
 function deltas{T<:FloatingPoint}(x::Array{T}, w::Int=9)
     (nr, nc) = size(x)
+    if nr==0 || w <= 1
+        return x
+    end
     hlen = ifloor(w/2)
     w = 2hlen+1                 # make w odd
     win = [convert(T,hlen):-1:-hlen]
-    xx = vcat(repmat(x[1,:], hlen, 1), x, repmat(x[end,:], hlen, 1))
-    return (xx | Filter(win))[2hlen+(1:nr),:]
+    xx = vcat(repmat(x[1,:], hlen, 1), x, repmat(x[end,:], hlen, 1)) ## take care of boundaries
+    norm = 3/(hlen*w*(hlen+1))
+    return norm * (xx | Filter(win))[2hlen+(1:nr),:]
 end
 
 
