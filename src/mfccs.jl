@@ -98,7 +98,7 @@ function warp{T<:FloatingPoint}(x::Array{T}, w=399)
             rank[i,:] = 1 .+ sum(broadcast(.>, x[i,:], x[s:e,:]), 1)  # sum over columns
         end
     end
-    return erfinvtab[rank]q
+    return erfinvtab[rank]
 end
 
 znorm(x::Array, dim::Int=1) = broadcast(/, broadcast(-, x, mean(x, dim)), std(x, dim))
