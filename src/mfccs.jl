@@ -6,20 +6,21 @@
 using Rasta
 using SignalProcessing
 
-nrow(x) = size(x,1)
-ncol(x) = size(x,2)
-
 ## This function accepts a vector of sample values, below we will generalize to arrays, 
 ## i.e., multichannel data
 ## Recoded from rastamat's "melfcc.m" (c) Dan Ellis. 
 ## Defaults here are HTK parameters, this is contrary to melfcc
 function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::FloatingPoint=16000.0; wintime=0.025, steptime=0.01, numcep=13, 
               lifterexp=-22, sumpower=false, preemph=0.97, dither=false, minfreq=0.0, maxfreq=sr/2,
-              nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel, usecmp=false, modelorder=0)
-    if (preemph!=0) 
-        x |= Filter([1., -preemph])
+              nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel, usecmp=false, modelorder=0, method=:DSP)
+    if (preemph!=0)
+        if method == :DSP
+            x = filt(TFFilter([1., -preemph], [1.]), x)
+        else
+            x |= Filter([1., -preemph])     # this is not in-place!
+        end
     end
-    pspec = powspec(x, sr, wintime=wintime, steptime=steptime, dither=dither)
+    pspec = powspec(x, sr, wintime=wintime, steptime=steptime, dither=dither, method=method)
     aspec = audspec(pspec, sr, nfilts=nbands, fbtype=fbtype, minfreq=minfreq, maxfreq=maxfreq, sumpower=sumpower, bwidth=bwidth)
     if usecmp
         #  PLP-like weighting/compression
@@ -30,7 +31,7 @@ function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::FloatingPoint=16000.0; wintime
             ## error, unimplemented
         end
         # LPC analysis 
-        lpcas = dolpc(aspectrum, modelorder)
+        lpcas = dolpc(aspec, modelorder)
         # cepstra
         cepstra = lpc2cep(lpcas, numcep)
     else
@@ -80,22 +81,22 @@ import Base.Sort.sortperm
 sortperm(a::Array,dim::Int) = mapslices(sortperm, a, dim)
 
 function warp{T<:Real}(x::Array{T}, w=399)
-    l = nrow(x)
-    wl = min(w, l)
+    nx, nfea = size(x)
+    wl = min(w, nx)
     hw = (wl+1)/2
     erfinvtab = sqrt(2)*erfinv([1:wl]/hw .- 1)
     rank = zeros(Int, size(x))
-    if l<w
+    if nx<w
         index = sortperm(x, 1)
-        for j=1:ncol(x)
-            rank[index[:,j],j] = [1:l]
+        for j=1:nfea
+            rank[index[:,j],j] = [1:nx]
         end
     else
-        for i=1:l
+        for i=1:nx
             s=max(1,i-iround(hw)+1)
             e=s+w-1
-            if (e>l) 
-                d = e-l
+            if (e>nx)
+                d = e-nx
                 e -= d
                 s -= d
             end
