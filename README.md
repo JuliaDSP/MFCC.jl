@@ -1,7 +1,7 @@
 MFCC
 =====
 
-This module allows computing Mel Frequency Cepstral Coeffiencts.
+This module computes Mel Frequency Cepstral Coeffiencts.
 
 The essential routine is re-coded from Dan Ellis's rastamat package, and parameters are named similarly.   
 
