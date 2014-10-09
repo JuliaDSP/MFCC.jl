@@ -9,15 +9,11 @@
 ## Defaults here are HTK parameters, this is contrary to melfcc
 function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::FloatingPoint=16000.0; wintime=0.025, steptime=0.01, numcep=13, 
               lifterexp=-22, sumpower=false, preemph=0.97, dither=false, minfreq=0.0, maxfreq=sr/2,
-              nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel, usecmp=false, modelorder=0, method=:DSP)
+              nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel, usecmp=false, modelorder=0)
     if (preemph!=0)
-        if method == :DSP
-            x = filt(TFFilter([1., -preemph], [1.]), x)
-        else
-            x |= Filter([1., -preemph])     # this is not in-place!
-        end
+        x = filt(TFFilter([1., -preemph], [1.]), x)
     end
-    pspec = powspec(x, sr, wintime=wintime, steptime=steptime, dither=dither, method=method)
+    pspec = powspec(x, sr, wintime=wintime, steptime=steptime, dither=dither)
     aspec = audspec(pspec, sr, nfilts=nbands, fbtype=fbtype, minfreq=minfreq, maxfreq=maxfreq, sumpower=sumpower, bwidth=bwidth)
     if usecmp
         #  PLP-like weighting/compression
