@@ -4,7 +4,7 @@
 ## Recoded from / inspired by melfcc from Dan Ellis's rastamat package. 
 
 using Rasta
-using SignalProcessing
+using DSP
 
 ## This function accepts a vector of sample values, below we will generalize to arrays, 
 ## i.e., multichannel data
@@ -62,8 +62,8 @@ function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::FloatingPoint, defaults::Symbo
     end
 end
 
-## our features run down with time
-function deltas{T<:FloatingPoint}(x::Array{T}, w::Int=9)
+## our features run down with time, this is essential for the use of DSP.filt()
+function deltas{T<:FloatingPoint}(x::Matrix{T}, w::Int=9)
     (nr, nc) = size(x)
     if nr==0 || w <= 1
         return x
@@ -73,7 +73,7 @@ function deltas{T<:FloatingPoint}(x::Array{T}, w::Int=9)
     win = [convert(T,hlen):-1:-hlen]
     xx = vcat(repmat(x[1,:], hlen, 1), x, repmat(x[end,:], hlen, 1)) ## take care of boundaries
     norm = 3/(hlen*w*(hlen+1))
-    return norm * (xx | Filter(win))[2hlen+(1:nr),:]
+    return norm * filt(TFFilter(win, [1.]), xx)[2hlen+(1:nr),:]
 end
 
 
@@ -109,10 +109,13 @@ end
 znorm(x::Array, dim::Int=1) = broadcast(/, broadcast(-, x, mean(x, dim)), std(x, dim))
 znorm!(x::Array, dim::Int=1) = broadcast!(/, x, broadcast!(-, x, x, mean(x, dim)), std(x, dim))
 
-function sdc{T<:FloatingPoint}(x::Array{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7)
-    (nx, nfea) = size(x)
-    @assert n <= nfea
-    xx = vcat(deltas(x[:,1:n], 2d+1), zeros(eltype(x), (k-1)*p, n))
+## Shifted Delta Coefficients by copying
+function sdc{T<:FloatingPoint}(x::Matrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7)
+    nx, nfea = size(x)
+    n <= nfea || error("Not enough features for n")
+    hnfill = (k-1)*p/2
+    nfill1, nfill2 = ifloor(hnfill), iceil(hnfill)
+    xx = vcat(zeros(eltype(x), nfill1, n), deltas(x[:,1:n], 2d+1), zeros(eltype(x), nfill2, n))
     y = zeros(eltype(x), nx, n*k)
     for (dt,offset) = zip(0:p:p*k-1,0:n:n*k-1)
         y[:,offset+(1:n)] = xx[dt+(1:nx),:]
