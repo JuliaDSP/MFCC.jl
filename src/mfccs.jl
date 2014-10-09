@@ -7,7 +7,7 @@
 ## i.e., multichannel data
 ## Recoded from rastamat's "melfcc.m" (c) Dan Ellis. 
 ## Defaults here are HTK parameters, this is contrary to melfcc
-function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::FloatingPoint=16000.0; wintime=0.025, steptime=0.01, numcep=13, 
+function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numcep=13, 
               lifterexp=-22, sumpower=false, preemph=0.97, dither=false, minfreq=0.0, maxfreq=sr/2,
               nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel, usecmp=false, modelorder=0)
     if (preemph!=0)
@@ -38,7 +38,7 @@ function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::FloatingPoint=16000.0; wintime
             "usecmp" => usecmp, "modelorder" => modelorder}
     return (cepstra, pspec', meta)
 end
-mfcc{T<:FloatingPoint}(x::Array{T}, sr::FloatingPoint=16000.0...) = @parallel (tuple) for i=1:size(x)[2] mfcc(x[:,i], sr...) end
+mfcc{T<:FloatingPoint}(x::Array{T}, sr::Real=16000.0...) = @parallel (tuple) for i=1:size(x)[2] mfcc(x[:,i], sr...) end
 
 ## default feature configurations, :rasta, :htk, :spkid_toolkit, :wbspeaker
 function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::FloatingPoint, defaults::Symbol) 

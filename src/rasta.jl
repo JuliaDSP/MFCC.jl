@@ -1,11 +1,13 @@
-## Freely adapted from Dan Ellis's rastamat matlab (matlab is a trandemark) package.  
+## (c) 2013--2014 David A. van Leeuwen, (c) 2005--2012, Dan Ellis
+
+## Freely adapted from Dan Ellis's rastamat package.  
 ## We've kept routine names the same, but the interface has changed a bit. 
 
 ## we haven't implemented rasta filtering, yet, in fact.  These routines are a minimum for 
 ## encoding HTK-style mfccs
 
 # powspec tested against octave with simple vectors
-function powspec{T<:FloatingPoint}(x::Vector{T}, sr::FloatingPoint=8000.0; wintime=0.025, steptime=0.01, dither=true, method=:DSP)
+function powspec{T<:FloatingPoint}(x::Vector{T}, sr::Real=8000.0; wintime=0.025, steptime=0.01, dither=true)
     nwin = iround(wintime*sr)
     nstep = iround(steptime*sr)
 
@@ -13,21 +15,16 @@ function powspec{T<:FloatingPoint}(x::Vector{T}, sr::FloatingPoint=8000.0; winti
     window = hamming(nwin)      # overrule default in specgram which is hanning in Octave
     noverlap = nwin - nstep
 
-    if method==:DSP
-        y = spectrogram(x .* (1<<15), nwin, noverlap, nfft=nfft, fs=sr, window=window, onesided=true).power
-        ## for compability with previous specgram method, remove the last frequency and scale
-        y = y[1:end-1,:] ##  * sumabs2(window) * sr / 2
-        y .+= dither * nwin 
-    else
-        y = abs2(specgram(x .* (1<<15), nfft; sr=sr, window=window, overlap=noverlap)[1])
-        y .+= dither * nwin
-    end
+    y = spectrogram(x .* (1<<15), nwin, noverlap, nfft=nfft, fs=sr, window=window, onesided=true).power
+    ## for compability with previous specgram method, remove the last frequency and scale
+    y = y[1:end-1,:] ##  * sumabs2(window) * sr / 2
+    y .+= dither * nwin / (sumabs2(window) * sr / 2)
 
     return y
 end
 
 # audspec tested against octave with simple vectors for all fbtypes
-function audspec{T<:FloatingPoint}(x::Array{T}, sr::FloatingPoint=16000.0; nfilts=iceil(hz2bark(sr/2)), fbtype=:bark, 
+function audspec{T<:FloatingPoint}(x::Array{T}, sr::Real=16000.0; nfilts=iceil(hz2bark(sr/2)), fbtype=:bark, 
                  minfreq=0, maxfreq=sr/2, sumpower=true, bwidth=1.0)
     (nfreqs,nframes)=size(x)
     nfft = 2(nfreqs-1)
@@ -36,11 +33,13 @@ function audspec{T<:FloatingPoint}(x::Array{T}, sr::FloatingPoint=16000.0; nfilt
     elseif fbtype==:mel
         wts = fft2melmx(nfft, nfilts, sr=sr, width=bwidth, minfreq=minfreq, maxfreq=maxfreq)
     elseif fbtype==:htkmel
-        wts = fft2melmx(nfft, nfilts, sr=sr, width=bwidth, minfreq=minfreq, maxfreq=maxfreq, htkmel=true, constamp=true)
+        wts = fft2melmx(nfft, nfilts, sr=sr, width=bwidth, minfreq=minfreq, maxfreq=maxfreq,
+                        htkmel=true, constamp=true)
     elseif fbtype==:fcmel
-        wts = fft2melmx(nfft, nfilts, sr=sr, width=bwidth, minfreq=minfreq, maxfreq=maxfreq, htkmel=true, constamp=false)
+        wts = fft2melmx(nfft, nfilts, sr=sr, width=bwidth, minfreq=minfreq, maxfreq=maxfreq,
+                        htkmel=true, constamp=false)
     else
-        error("Unknown filtrerbank type ", fbtype)
+        error("Unknown filterbank type ", fbtype)
     end
     wts = wts[:,1:nfreqs]
     if sumpower
@@ -102,7 +101,7 @@ function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0, ma
     return wts
 end
 
-function hz2mel{T<:Real}(f::Vector{T}, htk=false)
+function hz2mel{T<:FloatingPoint}(f::Vector{T}, htk=false)
     if htk
         return 2595 * log10(1+f/700)
     else
@@ -118,9 +117,9 @@ function hz2mel{T<:Real}(f::Vector{T}, htk=false)
     end
     return z
 end
-hz2mel(f::Number, htk=false)  = hz2mel([f], htk)[1]
+hz2mel(f::FloatingPoint, htk=false)  = hz2mel([f], htk)[1]
 
-function mel2hz{T<:Real}(z::Array{T}, htk=false) 
+function mel2hz{T<:FloatingPoint}(z::Vector{T}, htk=false) 
     if htk
         f = 700*(10.^(z/2595)-1)
     else
@@ -137,7 +136,7 @@ function mel2hz{T<:Real}(z::Array{T}, htk=false)
     return f
 end
 
-function postaud{T<:FloatingPoint}(x::Array{T}, fmax::Real, fbtype=:bark, broaden=false)
+function postaud{T<:FloatingPoint}(x::Matrix{T}, fmax::Real, fbtype=:bark, broaden=false)
     (nbands,nframes) = size(x)
     nfpts = nbands+2broaden
     if fbtype==:bark
@@ -147,7 +146,7 @@ function postaud{T<:FloatingPoint}(x::Array{T}, fmax::Real, fbtype=:bark, broade
     elseif fbtype==:htkmel || fbtype==:fcmel
         bandcfhz = mel2hz(linspace(0, hz2mel(fmax,1), nfpts),1);
     else
-        ## error
+        error("Unknown filterbank type")
     end
     # Remove extremal bands (the ones that will be duplicated)
     bandcfhz = bandcfhz[1+broaden:nfpts-broaden];
@@ -232,13 +231,13 @@ function lifter{T<:FloatingPoint}(x::Array{T}, lift::Real=0.6, invs=false)
     end
     if lift>0
         if lift>10
-            ## error
+            error("Too high lift number")
         end
         liftw = [1, [1:ncep-1].^lift]
     else
         # Hack to support HTK liftering
         if !isa(lift, Int)
-            ## error
+            error("Negative lift must be interger")
         end
         liftw = [1, (1 + lift/2*sin([1:ncep-1]π/lift))]
     end
