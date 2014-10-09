@@ -3,9 +3,6 @@
 
 ## Recoded from / inspired by melfcc from Dan Ellis's rastamat package. 
 
-using Rasta
-using DSP
-
 ## This function accepts a vector of sample values, below we will generalize to arrays, 
 ## i.e., multichannel data
 ## Recoded from rastamat's "melfcc.m" (c) Dan Ellis. 
