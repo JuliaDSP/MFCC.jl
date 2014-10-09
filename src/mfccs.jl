@@ -31,11 +31,11 @@ function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, s
         cepstra = spec2cep(aspec, numcep, dcttype)
     end
     cepstra = lifter(cepstra, lifterexp)'
-    meta = {"sr" => sr, "wintime" => wintime, "steptime" => steptime, "numcep" => numcep,
+    meta = ["sr" => sr, "wintime" => wintime, "steptime" => steptime, "numcep" => numcep,
             "lifterexp" => lifterexp, "sumpower" => sumpower, "preemph" => preemph, 
             "dither" => dither, "minfreq" => minfreq, "maxfreq" => maxfreq, "nbands" => nbands,
             "bwidth" => bwidth, "dcttype" => dcttype, "fbtype" => fbtype, 
-            "usecmp" => usecmp, "modelorder" => modelorder}
+            "usecmp" => usecmp, "modelorder" => modelorder]
     return (cepstra, pspec', meta)
 end
 mfcc{T<:FloatingPoint}(x::Array{T}, sr::Real=16000.0...) = @parallel (tuple) for i=1:size(x)[2] mfcc(x[:,i], sr...) end
