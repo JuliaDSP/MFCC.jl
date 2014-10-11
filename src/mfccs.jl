@@ -78,22 +78,28 @@ function warpstats{T<:Real}(x::Matrix{T}, w::Int=399)
     wl = min(w, nx)
     hw = (wl+1)/2
     erfinvtab = sqrt(2)*erfinv([1:wl]/hw .- 1)
-    rank = zeros(Int, size(x))
+    rank = similar(x, Int)
     if nx<w
         index = sortperm(x, 1)
         for j=1:nfea
             rank[index[:,j],j] = [1:nx]
         end
     else
-        for i=1:nx
-            s=max(1,i-iround(hw)+1)
-            e=s+w-1
-            if (e>nx)
-                d = e-nx
-                e -= d
-                s -= d
+        for j=1:nfea            # operations in outer loop over columns, better for memory cache
+            for i=1:nx
+                s=max(1,i-iround(hw)+1)
+                e=s+w-1
+                if (e>nx)
+                    d = e-nx
+                    e -= d
+                    s -= d
+                end
+                r = 1
+                for k in s:e
+                    r += x[i,j] > x[k,j]
+                end
+                rank[i,j] = r
             end
-            rank[i,:] = 1 .+ sum(broadcast(.>, x[i,:], x[s:e,:]), 1)  # sum over columns
         end
     end
     return rank, erfinvtab
@@ -103,6 +109,7 @@ function warp{T<:Real}(x::Matrix{T}, w::Int=399)
     rank, erfinvtab = warpstats(x, w)
     return erfinvtab[rank]
 end
+warp{T<:Real}(x::Vector{T}, w::Int=399) = warp(x'', w)
 
 function WarpedArray(x::Matrix, w::Int=399)
     rank, erfinvtab = warpstats(x, w)
