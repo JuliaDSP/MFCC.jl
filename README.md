@@ -1,4 +1,6 @@
-# MFCC
+MFCC
+====
+[![MFCC](http://pkg.julialang.org/badges/MFCC_release.svg)](http://pkg.julialang.org/?pkg=MFCC&ver=release)
 
 A package to compute Mel Frequency Cepstral Coeffiencts.
 
