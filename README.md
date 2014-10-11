@@ -1,7 +1,8 @@
 MFCC
-=====
+====
+[![MFCC](http://pkg.julialang.org/badges/MFCC_release.svg)](http://pkg.julialang.org/?pkg=MFCC&ver=release)
 
-This module computes Mel Frequency Cepstral Coeffiencts.
+A package to compute Mel Frequency Cepstral Coeffiencts.
 
 The essential routine is re-coded from Dan Ellis's rastamat package, and parameters are named similarly.   
 
