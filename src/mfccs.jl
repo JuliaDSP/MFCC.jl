@@ -73,7 +73,7 @@ end
 import Base.Sort.sortperm
 sortperm(a::Array,dim::Int) = mapslices(sortperm, a, dim)
 
-function warp{T<:Real}(x::Array{T}, w=399)
+function warpstats{T<:Real}(x::Matrix{T}, w::Int=399)
     nx, nfea = size(x)
     wl = min(w, nx)
     hw = (wl+1)/2
@@ -96,7 +96,17 @@ function warp{T<:Real}(x::Array{T}, w=399)
             rank[i,:] = 1 .+ sum(broadcast(.>, x[i,:], x[s:e,:]), 1)  # sum over columns
         end
     end
+    return rank, erfinvtab
+end
+
+function warp{T<:Real}(x::Matrix{T}, w::Int=399)
+    rank, erfinvtab = warpstats(x, w)
     return erfinvtab[rank]
+end
+
+function WarpedArray(x::Matrix, w::Int=399)
+    rank, erfinvtab = warpstats(x, w)
+    WarpedArray(rank, erfinvtab)
 end
 
 znorm(x::Array, dim::Int=1) = broadcast(/, broadcast(-, x, mean(x, dim)), std(x, dim))
