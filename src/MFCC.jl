@@ -8,12 +8,14 @@ module MFCC
 export powspec, audspec, postaud, lifter
 export mfcc, deltas, warp, sdc, znorm, znorm!
 export save, load
+export feacalc
 
 using DSP
 using HDF5
 
 include("rasta.jl")
 include("mfccs.jl")
+include("feacalc.jl")
 include("io.jl")
 
 end
