@@ -113,7 +113,7 @@ function warp{T<:Real}(x::Matrix{T}, w::Int=399)
 end
 warp{T<:Real}(x::Vector{T}, w::Int=399) = warp(x'', w)
 
-function WarpedArray(x::Matrix, w::Int=399)
+function WarpedArray(x::Matrix, w::Int)
     rank, erfinvtab = warpstats(x, w)
     WarpedArray(rank, erfinvtab)
 end

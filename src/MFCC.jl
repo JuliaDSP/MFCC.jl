@@ -1,5 +1,5 @@
 ## MFCC.jl
-## (c) 2013-2014 David A. van Leeuwen, (c) 2005--2012 Dan Ellis
+## (c) 2013-2015 David A. van Leeuwen, (c) 2005--2012 Dan Ellis
 
 ## Recoded from / inspired by melfcc from Dan Ellis's rastamat package. 
 
@@ -7,10 +7,13 @@ module MFCC
 
 export powspec, audspec, postaud, lifter
 export mfcc, deltas, warp, sdc, znorm, znorm!
+export save, load
 
 using DSP
+using HDF5
 
 include("rasta.jl")
 include("mfccs.jl")
+include("io.jl")
 
 end
