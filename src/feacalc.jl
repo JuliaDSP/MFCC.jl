@@ -33,7 +33,7 @@ function feacalc(wavfile::String; method=:sox, augtype=:ddelta, normtype=:warp, 
 end
 
 ## assume we have an array already
-function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, defaults=:spkid_toolkit, dynrange::Real=30., nwarp::Int=399, chan=:mono, sr::FloatingPoint=8000.0, source=":array")
+function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dynrange::Real=30., nwarp::Int=399, chan=:mono, sr::FloatingPoint=8000.0, source=":array", defaults=:nbspeaker, mfccargs...)
     if ndims(x)>1
         nsamples, nchan = size(x)
         if chan == :mono
@@ -60,7 +60,7 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, def
     preemp ^= 16000. / sr
 
     ## basic features
-    (m, pspec, params) = mfcc(x, sr, defaults)
+    (m, pspec, params) = mfcc(x, sr, defaults; mfccargs...)
     meta["totnframes"] = nrow(m)
     
     ## augment features

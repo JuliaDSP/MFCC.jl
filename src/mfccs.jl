@@ -43,15 +43,16 @@ end
 mfcc{T<:FloatingPoint}(x::Array{T}, sr::Real=16000.0...) = @parallel (tuple) for i=1:size(x)[2] mfcc(x[:,i], sr...) end
 
 ## default feature configurations, :rasta, :htk, :spkid_toolkit, :wbspeaker
-function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::FloatingPoint, defaults::Symbol) 
+## With optional extra agrs... you can specify more options
+function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::FloatingPoint, defaults::Symbol; args...) 
     if defaults==:rasta
-        mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=40, dcttype=2, fbtype=:mel)
-    elseif defaults==:spkid_toolkit
-        mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=30, dcttype=2, fbtype=:mel, minfreq=130., maxfreq=3900., numcep=20)
+        mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=40, dcttype=2, fbtype=:mel, args...)
+    elseif defaults ∈ [:spkid_toolkit, :nbspeaker]
+        mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=30, dcttype=2, fbtype=:mel, minfreq=130., maxfreq=3900., numcep=20, args...)
     elseif defaults == :wbspeaker
-        mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=63, dcttype=2, fbtype=:mel, minfreq=62.5, maxfreq=7937.5, numcep=20)
+        mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=63, dcttype=2, fbtype=:mel, minfreq=62.5, maxfreq=7937.5, numcep=20, args...)
     elseif defaults==:htk
-        mfcc(x, sr)
+        mfcc(x, sr; args...)
     else
         error("Unknown set of defaults ", defaults)
     end
