@@ -46,29 +46,39 @@ function retype(d::Dict)
     r
 end
 
-## but always read into float64 
+## Try to handle missing elements in the hdf5 file more gacefully
+function h5check(obj, name, content)
+    content ∈ names(obj) || error('"', name, '"', " does not contain ", '"', content, '"')
+    obj[content]
+end
+
+## Currently we always read the data in float64
 function feaload(file::String; meta=false, params=false)
-    fd = h5open(file, "r")
-    fea = float64(read(fd["features/data"]))
-    if length(fea)==0           # "no data"
-        m = read(fd["features/meta"])
-        fea = zeros(0,m["nfea"])
+    h5open(file, "r") do fd
+        f = h5check(fd, file, "features")
+        fea = float64(read(h5check(f, "features", "data")))
+        if length(fea)==0           # "no data"
+            m = read(h5check(f, "features", "meta"))
+            fea = zeros(0,m["nfea"])
+        end
+        if ! (meta || params)
+            return fea
+        end
+        res = Any[fea]
+        if meta
+            push!(res, retype(read(h5check(f, "features", "meta"))))
+        end
+        if params
+            push!(res, retype(read(h5check(f, "features", "params"))))
+        end
+        tuple(res...)
     end
-    if ! (meta || params)
-        return fea
-    end
-    res = Any[fea]
-    if meta
-        push!(res, retype(read(fd["features/meta"])))
-    end
-    if params
-        push!(res, retype(read(fd["features/params"])))
-    end
-    tuple(res...)
 end
 
 ## helper function to quickly determine the size of a feature file
 function feasize(file::String)
-    fd = h5open(file, "r")
-    size(fd["features/data"])
+    h5open(file, "r") do fd
+        f = h5check(fd, file, "features")
+        size(h5check(f, "features", "data"))
+    end
 end
