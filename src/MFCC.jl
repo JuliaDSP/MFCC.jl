@@ -7,7 +7,7 @@ module MFCC
 
 export powspec, audspec, postaud, lifter
 export mfcc, deltas, warp, sdc, znorm, znorm!
-export save, load
+export feasave, feaload, feasize
 export feacalc
 
 using DSP

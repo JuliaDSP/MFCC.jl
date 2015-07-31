@@ -15,7 +15,7 @@ HDF5.write(fd::HDF5File, s::ASCIIString, ss::SubString) = write(fd, s, ascii(ss)
 ## x: the MFCC data
 ## meta: a dict with parameters anout the data, nsamples, nframes, totnframes (before sad), ...
 ## params: a dict with parameters about the feature extraction itself. 
-function save{T<:FloatingPoint}(file::String, x::Matrix{T}; meta::Dict=Dict(), params::Dict=Dict())
+function feasave{T<:FloatingPoint}(file::String, x::Matrix{T}; meta::Dict=Dict(), params::Dict=Dict())
     dir = dirname(file)
     if length(dir)>0 && !isdir(dir)
         mkpath(dir)
@@ -47,7 +47,7 @@ function retype(d::Dict)
 end
 
 ## but always read into float64 
-function load(file::String; meta=false, params=false)
+function feaload(file::String; meta=false, params=false)
     fd = h5open(file, "r")
     fea = float64(read(fd["features/data"]))
     if length(fea)==0           # "no data"
@@ -65,4 +65,10 @@ function load(file::String; meta=false, params=false)
         push!(res, retype(read(fd["features/params"])))
     end
     tuple(res...)
+end
+
+## helper function to quickly determine the size of a feature file
+function feasize(file::String)
+    fd = h5open(file, "r")
+    size(fd["features/data"])
 end
