@@ -20,7 +20,7 @@ ncol(x) = size(x,2)
 
 ## compute features according to standard settingsm directly from a wav file. 
 ## this does channel at the time. 
-function feacalc(wavfile::String; method=:sox, augtype=:ddelta, normtype=:warp, sadtype=:energy, defaults=:spkid_toolkit, dynrange::Real=30., nwarp::Int=399, chan=:mono)
+function feacalc(wavfile::AbstractString; method=:sox, augtype=:ddelta, normtype=:warp, sadtype=:energy, defaults=:spkid_toolkit, dynrange::Real=30., nwarp::Int=399, chan=:mono)
     if method == :wav
         (x, sr) = wavread(wavfile)
     elseif method == :sox
@@ -33,7 +33,7 @@ function feacalc(wavfile::String; method=:sox, augtype=:ddelta, normtype=:warp, 
 end
 
 ## assume we have an array already
-function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dynrange::Real=30., nwarp::Int=399, chan=:mono, sr::FloatingPoint=8000.0, source=":array", defaults=:nbspeaker, mfccargs...)
+function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dynrange::Real=30., nwarp::Int=399, chan=:mono, sr::AbstractFloat=8000.0, source=":array", defaults=:nbspeaker, mfccargs...)
     if ndims(x)>1
         nsamples, nchan = size(x)
         if chan == :mono
@@ -54,8 +54,8 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
         nsamples, nchan = length(x), 1
     end
     ## save some metadata
-    meta = ["nsamples" => nsamples, "sr" => sr, "source" => source, "nchan" => nchan,
-            "chan" => chan]
+    meta = @compat Dict("nsamples" => nsamples, "sr" => sr, "source" => source, "nchan" => nchan,
+            "chan" => chan)
     preemp = 0.97
     preemp ^= 16000. / sr
 
@@ -118,7 +118,7 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
 end
 
 ## When called with a specific application in mind, call with two arguments
-function feacalc(wavfile::String, application::Symbol; chan=:mono, method=:sox)
+function feacalc(wavfile::AbstractString, application::Symbol; chan=:mono, method=:sox)
     if (application==:speaker)
         feacalc(wavfile; defaults=:spkid_toolkit, chan=chan, method=method)
     elseif application==:wbspeaker
@@ -144,7 +144,7 @@ function sad(pspec::Matrix{Float64}, sr::Float64, method=:energy; dynrange::Floa
 end
 
 ## listen to SAD
-function sad(wavfile::String, speechout::String, silout::String; dynrange::Float64=30.)
+function sad(wavfile::AbstractString, speechout::AbstractString, silout::AbstractString; dynrange::Float64=30.)
     (x, sr, nbits) = wavread(wavfile)
     sr = float64(sr)               # more reasonable sr
     x = vec(mean(x, 2))            # averave multiple channels for now

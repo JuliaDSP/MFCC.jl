@@ -1,9 +1,12 @@
 ## for development
 
+using Compat
 using DSP
 using HDF5
 
-require("types.jl")
+if !isdefined(:WarpedArray)
+    include("types.jl")
+end
     
 include("rasta.jl")
 include("mfccs.jl")

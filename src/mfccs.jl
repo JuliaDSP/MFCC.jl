@@ -9,7 +9,7 @@ using Compat
 ## i.e., multichannel data
 ## Recoded from rastamat's "melfcc.m" (c) Dan Ellis. 
 ## Defaults here are HTK parameters, this is contrary to melfcc
-function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numcep=13, 
+function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numcep=13, 
               lifterexp=-22, sumpower=false, preemph=0.97, dither=false, minfreq=0.0, maxfreq=sr/2,
               nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel, usecmp=false, modelorder=0)
     if (preemph!=0)
@@ -40,11 +40,11 @@ function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, s
             "usecmp" => usecmp, "modelorder" => modelorder)
     return (cepstra, pspec', meta)
 end
-mfcc{T<:FloatingPoint}(x::Array{T}, sr::Real=16000.0...) = @parallel (tuple) for i=1:size(x)[2] mfcc(x[:,i], sr...) end
+mfcc{T<:AbstractFloat}(x::Array{T}, sr::Real=16000.0...) = @parallel (tuple) for i=1:size(x)[2] mfcc(x[:,i], sr...) end
 
 ## default feature configurations, :rasta, :htk, :spkid_toolkit, :wbspeaker
 ## With optional extra agrs... you can specify more options
-function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::FloatingPoint, defaults::Symbol; args...) 
+function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::AbstractFloat, defaults::Symbol; args...) 
     if defaults==:rasta
         mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=40, dcttype=2, fbtype=:mel, args...)
     elseif defaults ∈ [:spkid_toolkit, :nbspeaker]
@@ -59,7 +59,7 @@ function mfcc{T<:FloatingPoint}(x::Vector{T}, sr::FloatingPoint, defaults::Symbo
 end
 
 ## our features run down with time, this is essential for the use of DSP.filt()
-function deltas{T<:FloatingPoint}(x::Matrix{T}, w::Int=9)
+function deltas{T<:AbstractFloat}(x::Matrix{T}, w::Int=9)
     (nr, nc) = size(x)
     if nr==0 || w <= 1
         return x
@@ -123,7 +123,7 @@ znorm(x::Array, dim::Int=1) = broadcast(/, broadcast(-, x, mean(x, dim)), std(x,
 znorm!(x::Array, dim::Int=1) = broadcast!(/, x, broadcast!(-, x, x, mean(x, dim)), std(x, dim))
 
 ## Shifted Delta Coefficients by copying
-function sdc{T<:FloatingPoint}(x::Matrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7)
+function sdc{T<:AbstractFloat}(x::Matrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7)
     nx, nfea = size(x)
     n <= nfea || error("Not enough features for n")
     hnfill = (k-1)*p/2

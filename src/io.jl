@@ -6,16 +6,16 @@
 ## Is that a valid argument?  I don't know
 
 ## encode non-HDF5 types in the key by adding type indicator---a poorman's solution
-HDF5.write(fd::HDF5File, s::ASCIIString, b::Bool) = write(fd, string(s,":Bool"), int8(b))
-HDF5.write(fd::HDF5File, s::ASCIIString, sym::Symbol) = write(fd, string(s,":Symbol"), string(sym))
-HDF5.write(fd::HDF5File, s::ASCIIString, ss::SubString) = write(fd, s, ascii(ss))
+HDF5.write(fd::HDF5File, s::AbstractString, b::Bool) = write(fd, string(s,":Bool"), int8(b))
+HDF5.write(fd::HDF5File, s::AbstractString, sym::Symbol) = write(fd, string(s,":Symbol"), string(sym))
+HDF5.write(fd::HDF5File, s::AbstractString, ss::SubString) = write(fd, s, ascii(ss))
 
 ## always save data in Float32
 ## the functiona arguments are the same as the output of feacalc
 ## x: the MFCC data
 ## meta: a dict with parameters anout the data, nsamples, nframes, totnframes (before sad), ...
 ## params: a dict with parameters about the feature extraction itself. 
-function feasave{T<:FloatingPoint}(file::String, x::Matrix{T}; meta::Dict=Dict(), params::Dict=Dict())
+function feasave{T<:AbstractFloat}(file::AbstractString, x::Matrix{T}; meta::Dict=Dict(), params::Dict=Dict())
     dir = dirname(file)
     if length(dir)>0 && !isdir(dir)
         mkpath(dir)
@@ -53,7 +53,7 @@ function h5check(obj, name, content)
 end
 
 ## Currently we always read the data in float64
-function feaload(file::String; meta=false, params=false)
+function feaload(file::AbstractString; meta=false, params=false)
     h5open(file, "r") do fd
         f = h5check(fd, file, "features")
         fea = float64(read(h5check(f, "features", "data")))
@@ -76,7 +76,7 @@ function feaload(file::String; meta=false, params=false)
 end
 
 ## helper function to quickly determine the size of a feature file
-function feasize(file::String)
+function feasize(file::AbstractString)
     h5open(file, "r") do fd
         f = h5check(fd, file, "features")
         size(h5check(f, "features", "data"))
