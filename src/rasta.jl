@@ -8,10 +8,10 @@
 
 # powspec tested against octave with simple vectors
 function powspec{T<:AbstractFloat}(x::Vector{T}, sr::Real=8000.0; wintime=0.025, steptime=0.01, dither=true)
-    nwin = iround(wintime*sr)
-    nstep = iround(steptime*sr)
+    nwin = @compat round(Integer, wintime*sr)
+    nstep = @compat round(Integer, steptime*sr)
 
-    nfft = 1 << iceil(log2(nwin))
+    nfft = nextpow2(nwin)
     window = hamming(nwin)      # overrule default in specgram which is hanning in Octave
     noverlap = nwin - nstep
 
@@ -73,11 +73,11 @@ end
 function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0, maxfreq=sr/2, htkmel=false, constamp=false)
     wts=zeros(nfilts, nfft)
     # Center freqs of each DFT bin
-    fftfreqs = [0:nfft-1]/nfft*sr; 
+    fftfreqs = collect(0:nfft-1) / nfft * sr; 
     # 'Center freqs' of mel bands - uniformly spaced between limits
     minmel = hz2mel(minfreq, htkmel); 
     maxmel = hz2mel(maxfreq, htkmel);
-    binfreqs = mel2hz(minmel .+ [0:(nfilts+1)]/(nfilts+1)*(maxmel-minmel), htkmel);
+    binfreqs = mel2hz(minmel .+ collect(0:(nfilts+1)) / (nfilts+1) * (maxmel-minmel), htkmel);
 ##    binbin = iround(binfrqs/sr*(nfft-1));
     
     for i=1:nfilts
@@ -85,10 +85,10 @@ function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0, ma
         # scale by width
         fs = fs[2] .+ (fs .- fs[2])width
         # lower and upper slopes for all bins
-        loslope = (fftfreqs .- fs[1])/diff(fs[1:2])
-        hislope = (fs[3] .- fftfreqs)/diff(fs[2:3])
+        loslope = (fftfreqs .- fs[1]) / diff(fs[1:2])
+        hislope = (fs[3] .- fftfreqs) / diff(fs[2:3])
         # then intersect them with each other and zero
-        wts[i,:] = max(0, min(loslope,hislope))
+        wts[i,:] = max(0, min(loslope, hislope))
     end
     
     if !constamp
@@ -203,21 +203,21 @@ function spec2cep{T<:AbstractFloat}(spec::Array{T}, ncep::Int=13, dcttype::Int=2
     dctm = zeros(typeof(spec[1]), ncep, nr)
     if 1 < dcttype < 4          # type 2,3
         for i=1:ncep
-            dctm[i,:] = cos((i-1)*[1:2:2nr-1]π/(2nr)) * sqrt(2/nr)
+            dctm[i,:] = cos((i-1) * collect(1:2:2nr-1)π/(2nr)) * sqrt(2/nr)
         end
         if dcttype==2
             dctm[1,:] /= sqrt(2)
         end
     elseif dcttype==4           # type 4
         for i=1:ncep
-            dctm[i,:] = 2cos((i-1)*[1:nr]π/(nr+1))
+            dctm[i,:] = 2cos((i-1) * collect(1:nr)π/(nr+1))
             dctm[i,1] += 1
             dctm[i,nr] += (-1)^(i-1)
         end
         dctm /= 2(nr+1)
     else                        # type 1
         for i=1:ncep
-            dctm[i,:] = cos((i-1)*[0:nr-1]π/(nr-1)) / (nr-1)
+            dctm[i,:] = cos((i-1) * collect(0:nr-1)π/(nr-1)) / (nr-1)
         end
         dctm[:,[1,nr]] /= 2
     end
@@ -233,7 +233,7 @@ function lifter{T<:AbstractFloat}(x::Array{T}, lift::Real=0.6, invs=false)
         if lift>10
             error("Too high lift number")
         end
-        liftw = [1, [1:ncep-1].^lift]
+        liftw = [1; collect(1:ncep-1).^lift]
     else
         # Hack to support HTK liftering
         if !isa(lift, Int)

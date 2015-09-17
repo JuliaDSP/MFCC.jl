@@ -21,7 +21,7 @@ function feasave{T<:AbstractFloat}(file::AbstractString, x::Matrix{T}; meta::Dic
         mkpath(dir)
     end
     fd = h5open(file, "w")
-    fd["features/data"] = float32(x)
+    fd["features/data"] = @compat map(Float32, x)
     for (k,v) in meta
         fd[string("features/meta/", k)] = v
     end
@@ -56,7 +56,7 @@ end
 function feaload(file::AbstractString; meta=false, params=false)
     h5open(file, "r") do fd
         f = h5check(fd, file, "features")
-        fea = float64(read(h5check(f, "features", "data")))
+        fea = @compat map(Float64, read(h5check(f, "features", "data")))
         if length(fea)==0           # "no data"
             m = read(h5check(f, "features", "meta"))
             fea = zeros(0,m["nfea"])

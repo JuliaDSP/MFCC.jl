@@ -20,7 +20,7 @@ ncol(x) = size(x,2)
 
 ## compute features according to standard settingsm directly from a wav file. 
 ## this does channel at the time. 
-function feacalc(wavfile::AbstractString; method=:sox, augtype=:ddelta, normtype=:warp, sadtype=:energy, defaults=:spkid_toolkit, dynrange::Real=30., nwarp::Int=399, chan=:mono)
+function feacalc(wavfile::AbstractString; method=:sox, augtype=:ddelta, normtype=:warp, sadtype=:energy, defaults=:nbspeaker, dynrange::Real=30., nwarp::Int=399, chan=:mono)
     if method == :wav
         (x, sr) = wavread(wavfile)
     elseif method == :sox
@@ -28,7 +28,7 @@ function feacalc(wavfile::AbstractString; method=:sox, augtype=:ddelta, normtype
     elseif method == :sphere
         (x, sr) = sphread(wavfile)
     end
-    sr = float64(sr)       # more reasonable sr
+    sr = @compat Float64(sr)       # more reasonable sr
     feacalc(x; augtype=augtype, normtype=normtype, sadtype=sadtype, defaults=defaults, dynrange=dynrange, nwarp=nwarp, chan=chan, sr=sr, source=wavfile)
 end
 
@@ -89,7 +89,7 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
             speech = find(power .> maxpow - dynrange)
             params["dynrange"] = dynrange
         elseif sadtype==:none
-            speech = [1:nrow(m)]
+            speech = collect(1:nrow(m))
         end
     else
         speech=Int[]
@@ -97,7 +97,7 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
     meta["sadtype"] = sadtype
     ## perform SAD
     m = m[speech,:]
-    meta["speech"] = uint32(speech)
+    meta["speech"] = @compat map(UInt32, speech)
     meta["nframes"] , meta["nfea"] = size(m)
     
     ## normalization
@@ -114,7 +114,7 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
         end
         meta["normtype"] = normtype
     end
-    return(float32(m), meta, params)
+    return(@compat map(Float32, m), meta, params)
 end
 
 ## When called with a specific application in mind, call with two arguments

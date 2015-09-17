@@ -10,8 +10,10 @@ export mfcc, deltas, warp, sdc, znorm, znorm!
 export feasave, feaload, feasize
 export feacalc
 
+using Compat
 using DSP
 using HDF5
+using WAV
 
 include("rasta.jl")
 include("mfccs.jl")
