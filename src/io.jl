@@ -1,12 +1,12 @@
 ## io.jl
 ## (c) 2014 David A. van Leeuwen
 ##
-## i/o functions for speech feature data.  
+## i/o functions for speech feature data.
 ## For compatibility reasons, we do not use JLD but encode everything in HDF5 types
 ## Is that a valid argument?  I don't know
 
 ## encode non-HDF5 types in the key by adding type indicator---a poorman's solution
-HDF5.write(fd::HDF5File, s::AbstractString, b::Bool) = write(fd, string(s,":Bool"), int8(b))
+HDF5.write(fd::HDF5File, s::AbstractString, b::Bool) = write(fd, string(s,":Bool"), Int8(b))
 HDF5.write(fd::HDF5File, s::AbstractString, sym::Symbol) = write(fd, string(s,":Symbol"), string(sym))
 HDF5.write(fd::HDF5File, s::AbstractString, ss::SubString) = write(fd, s, ascii(ss))
 
@@ -14,7 +14,7 @@ HDF5.write(fd::HDF5File, s::AbstractString, ss::SubString) = write(fd, s, ascii(
 ## the functiona arguments are the same as the output of feacalc
 ## x: the MFCC data
 ## meta: a dict with parameters anout the data, nsamples, nframes, totnframes (before sad), ...
-## params: a dict with parameters about the feature extraction itself. 
+## params: a dict with parameters about the feature extraction itself.
 function feasave{T<:AbstractFloat}(file::AbstractString, x::Matrix{T}; meta::Dict=Dict(), params::Dict=Dict())
     dir = dirname(file)
     if length(dir)>0 && !isdir(dir)
@@ -31,7 +31,7 @@ function feasave{T<:AbstractFloat}(file::AbstractString, x::Matrix{T}; meta::Dic
     close(fd)
 end
 
-## the reverse encoding of Julia types. 
+## the reverse encoding of Julia types.
 function retype(d::Dict)
     r = Dict()
     for (k,v) in d

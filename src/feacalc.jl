@@ -1,4 +1,4 @@
-## Feacalc.jl Full implementation of feature calculation for speech files. 
+## Feacalc.jl Full implementation of feature calculation for speech files.
 ## (c) 2013 David A. van Leeuwen
 
 ## This program is free software: you can redistribute it and/or modify
@@ -11,15 +11,15 @@
 ##     GNU General Public License for more details.
 
 ##     You should have received a copy of the GNU General Public License
-##     along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+##     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-## Feacalc.  Feature calculation as used for speaker and language recognition. 
+## Feacalc.  Feature calculation as used for speaker and language recognition.
 
 nrow(x) = size(x,1)
 ncol(x) = size(x,2)
 
-## compute features according to standard settingsm directly from a wav file. 
-## this does channel at the time. 
+## compute features according to standard settingsm directly from a wav file.
+## this does channel at the time.
 function feacalc(wavfile::AbstractString; method=:sox, augtype=:ddelta, normtype=:warp, sadtype=:energy, defaults=:nbspeaker, dynrange::Real=30., nwarp::Int=399, chan=:mono)
     if method == :wav
         (x, sr) = wavread(wavfile)
@@ -41,7 +41,7 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
         elseif in(chan, [:a, :b])
             channum = findin([:a, :b], [chan])
             x = vec(x[:,channum])
-        elseif isa(chan, Integer) 
+        elseif isa(chan, Integer)
             if !(chan in 1:nchan)
                 error("Bad channel specification: ", chan)
             end
@@ -56,20 +56,20 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
     ## save some metadata
     meta = @compat Dict("nsamples" => nsamples, "sr" => sr, "source" => source, "nchan" => nchan,
             "chan" => chan)
-    preemp = 0.97
-    preemp ^= 16000. / sr
+    preemph = 0.97
+    preemph ^= 16000. / sr
 
     ## basic features
-    (m, pspec, params) = mfcc(x, sr, defaults; mfccargs...)
+    (m, pspec, params) = mfcc(x, sr, defaults; preemph=preemph, mfccargs...)
     meta["totnframes"] = nrow(m)
-    
+
     ## augment features
     if augtype==:delta || augtype==:ddelta
         d = deltas(m)
         if augtype==:ddelta
             dd = deltas(d)
             m = hcat(m, d, dd)
-        else 
+        else
             m = hcat(m, d)
         end
     elseif augtype==:sdc
@@ -81,10 +81,10 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
         if sadtype==:energy
             ## integrate power
             deltaf = size(pspec,2) / (sr/2)
-            minfreqi = iround(300deltaf)
-            maxfreqi = iround(4000deltaf)
+            minfreqi = round(Int, 300deltaf)
+            maxfreqi = round(Int, 4000deltaf)
             power = 10log10(sum(pspec[:,minfreqi:maxfreqi], 2))
-            
+
             maxpow = maximum(power)
             speech = find(power .> maxpow - dynrange)
             params["dynrange"] = dynrange
@@ -99,7 +99,7 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
     m = m[speech,:]
     meta["speech"] = @compat map(UInt32, speech)
     meta["nframes"] , meta["nfea"] = size(m)
-    
+
     ## normalization
     if nrow(m)>0
         if normtype==:warp
@@ -124,10 +124,10 @@ function feacalc(wavfile::AbstractString, application::Symbol; chan=:mono, metho
     elseif application==:wbspeaker
         feacalc(wavfile; defaults=:wbspeaker, chan=chan, method=method)
     elseif (application==:language)
-        feacalc(wavfile; defaults=:rasta, nwarp=299, augtype=:sdc, chan=chan, 
+        feacalc(wavfile; defaults=:rasta, nwarp=299, augtype=:sdc, chan=chan,
                 method=method)
     elseif (application==:diarization)
-        feacalc(wavfile; defaults=:rasta, sadtype=:none, normtype=:mvn, 
+        feacalc(wavfile; defaults=:rasta, sadtype=:none, normtype=:mvn,
                 augtype=:none, chan=chan, method=method)
     else
         error("Unknown application ", application)
@@ -136,8 +136,8 @@ end
 
 function sad(pspec::Matrix{Float64}, sr::Float64, method=:energy; dynrange::Float64=30.)
     deltaf = size(pspec,2) / (sr/2)
-    minfreqi = iround(300deltaf)
-    maxfreqi = iround(4000deltaf)
+    minfreqi = round(Int, 300deltaf)
+    maxfreqi = round(Int, 4000deltaf)
     power = 10log10(sum(pspec[:,minfreqi:maxfreqi], 2))
     maxpow = maximum(power)
     speech = find(power .> maxpow - dynrange)
@@ -150,7 +150,7 @@ function sad(wavfile::AbstractString, speechout::AbstractString, silout::Abstrac
     x = vec(mean(x, 2))            # averave multiple channels for now
     (m, pspec, meta) = mfcc(x, sr; preemph=0)
     sp = sad(pspec, sr, dynrange=dynrange)
-    sl = iround(meta["steptime"] * sr)
+    sl = round(Int, meta["steptime"] * sr)
     xi = falses(size(x))
     for (i in sp)
         xi[(i-1)*sl+(1:sl)] = true
@@ -163,15 +163,15 @@ end
 
 ## this should probably be called soxread...
 function soxread(file)
-    nch = int(readall(`soxi -c $file`))
-    sr = int(readall(`soxi -r $file`))
+    nch = parse(Int, readall(`soxi -c $file`))
+    sr = parse(i=Int, readall(`soxi -r $file`))
     sox = `sox $file -t raw -e signed -r $sr -b 16 -`
     fd, proc = open(sox, "r")
     x = Int16[]
     while !eof(fd)
         push!(x, read(fd, Int16))
     end
-    ns = div(length(x), nch)
+    ns = length(x) ÷ nch
     reshape(x, nch, ns)' / (1<<15), sr
 end
 
@@ -185,7 +185,6 @@ function sphread(file)
     while !eof(fd)
         push!(x, read(fd, Int16))
     end
-    ns = div(length(x), nch)
+    ns = length(x) ÷ nch
     reshape(x, nch, ns)' / (1<<15), sr
 end
-    

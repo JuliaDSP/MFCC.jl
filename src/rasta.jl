@@ -25,7 +25,7 @@ end
 
 # audspec tested against octave with simple vectors for all fbtypes
 function audspec{T<:AbstractFloat}(x::Array{T}, sr::Real=16000.0; nfilts=iceil(hz2bark(sr/2)), fbtype=:bark, 
-                 minfreq=0, maxfreq=sr/2, sumpower=true, bwidth=1.0)
+                 minfreq=0., maxfreq=sr/2, sumpower=true, bwidth=1.0)
     (nfreqs,nframes)=size(x)
     nfft = 2(nfreqs-1)
     if fbtype==:bark
@@ -49,7 +49,7 @@ function audspec{T<:AbstractFloat}(x::Array{T}, sr::Real=16000.0; nfilts=iceil(h
     end
 end
 
-function fft2barkmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0, maxfreq=sr/2)
+function fft2barkmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0., maxfreq=sr/2)
     hnfft = nfft>>1
     minbark = hz2bark(minfreq)
     nyqbark = hz2bark(maxfreq) - minbark
@@ -60,13 +60,13 @@ function fft2barkmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0, max
         midbark = minbark + (i-1)*stepbark
         lof = (binbarks - midbark)/width - 0.5
         hif = (binbarks - midbark)/width + 0.5
-        logwts = min(0, min((hif, -2.5lof)))
+        logwts = min(0, hif, -2.5lof)
         wts[i,1:1+hnfft] = 10.0.^logwts
     end
     return wts
 end
 
-function hz2bark(f::Real)
+function hz2bark(f)
     return 6asinh(f/600)
 end
 
@@ -168,17 +168,17 @@ function postaud{T<:AbstractFloat}(x::Matrix{T}, fmax::Real, fbtype=:bark, broad
 end
     
 function dolpc{T<:AbstractFloat}(x::Array{T}, modelorder::Int=8) 
-    (nbands, nframes) = size(x)
-    r = real(ifft(vcat(x, x[[nbands-1:-1:2],:]), 1)[1:nbands,:])
+    nbands, nframes = size(x)
+    r = real(ifft(vcat(x, x[collect(nbands-1:-1:2),:]), 1)[1:nbands,:])
     # Find LPC coeffs by durbin
-    (y,e) = levinson(r, modelorder)
+    y, e = levinson(r, modelorder)
     # Normalize each poly by gain
-    y = broadcast(/, y, e)'
+    y ./= e
 end
 
 function lpc2cep{T<:AbstractFloat}(a::Array{T}, ncep::Int=0) 
-    (nlpc, nc) = size(a)
-    order = nlpc-1
+    nlpc, nc = size(a)
+    order = nlpc - 1
     if ncep==0
         ncep=nlpc
     end
@@ -187,7 +187,7 @@ function lpc2cep{T<:AbstractFloat}(a::Array{T}, ncep::Int=0)
     # First cep is log(Error) from Durbin
     c[1,:] = -log(a[1,:])
     # Renormalize lpc A coeffs
-    a = broadcast(/, a, a[1,:])
+    a ./= a[1,:]
     for n=2:ncep
         sum=0.0
         for m=2:n
@@ -236,10 +236,11 @@ function lifter{T<:AbstractFloat}(x::Array{T}, lift::Real=0.6, invs=false)
         liftw = [1; collect(1:ncep-1).^lift]
     else
         # Hack to support HTK liftering
-        if !isa(lift, Int)
+        if !isa(lift, Integer)
             error("Negative lift must be interger")
         end
-        liftw = [1, (1 + lift/2*sin([1:ncep-1]π/lift))]
+        lift = -lift            # strictly speaking unnecessary...
+        liftw = [1, (1 + lift/2*sin(collect(1:ncep-1)π/lift))]
     end
     if invs
         liftw = 1./liftw
@@ -247,3 +248,74 @@ function lifter{T<:AbstractFloat}(x::Array{T}, lift::Real=0.6, invs=false)
     return broadcast(*, x, liftw)
 end
 
+## Freely after octave's implementation, by Paul Kienzle <pkienzle@users.sf.net>
+## Permission granted to usee this in a MIT license on 20 dec 2013 by the author Paul Kienzle:
+## "You are welcome to move my octave code from GPL to MIT like core Julia."
+## untested
+## only returns a, v
+function levinson{T<:Real}(acf::Vector{T}, p::Int)
+    if length(acf)<1
+        error("empty autocorrelation function")
+    end
+    if p<0 
+        error("negative model order")
+    end
+    if p<100
+        ## direct solution [O(p^3), but no loops so slightly faster for small p]
+        ## Kay & Marple Eqn (2.39)
+        R = toeplitz(acf[1:p], conj(acf[1:p]))
+        a = R \ -acf[2:p+1]
+        unshift!(a, 1)
+        v = real(a.*conj(acf[1:p+1]))
+    else
+        ## durbin-levinson [O(p^2), so significantly faster for large p]
+        ## Kay & Marple Eqns (2.42-2.46)
+        ref = zeros(p)
+        g = -acf[2]/acf[1]
+        a = [g]
+        v = real((1-abs2(g)) * acf[1])
+        ref[1] = g
+        for t=2:p
+            g = -(acf[t+1] + dot(a,acf[t:-1:2])) / v
+            a = [a + g*conj(a[t-1:-1:1]), g]
+            v *= 1 - abs2(g)
+            ref[t] = g
+        end
+        unshift!(a, 1)
+    end
+    return (a,v)
+end
+
+function levinson{T<:Real}(acf::Array{T}, p::Int) 
+    (nr,nc) = size(acf)
+    a = zeros(p+1, nc)
+    v = zeros(p+1, nc)
+    for i=1:nc
+        (a[:,i],v[:,i]) = levinson(acf[:,i], p)
+    end
+    return (a,v)
+end
+
+## Freely after octave's implementation, ver 3.2.4, by  jwe && jh
+## skipped sparse implementation
+function toeplitz{T<:Real}(c::Vector{T}, r::Vector{T}=c)
+    nc = length(r)
+    nr = length(c)
+    res = zeros(typeof(c[1]), nr, nc)
+    if nc==0 || nc==0
+        return res
+    end
+    if r[1]!=c[1]
+        ## warn
+    end
+    if typeof(c) <: Complex
+        conj!(c)
+        c[1] = conj(c[1])       # bug in julia?
+    end
+    ## if issparse(c) && ispsparse(r)
+    data = [r[end:-1:2], c]
+    for (i,start)=zip(1:nc, nc:-1:1)
+        res[:,i] = data[start:start+nr-1]
+    end
+    return res
+end

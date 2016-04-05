@@ -1,15 +1,15 @@
 ## mfccs.jl
 ## (c) 2013--2014 David A. van Leeuwen
 
-## Recoded from / inspired by melfcc from Dan Ellis's rastamat package. 
+## Recoded from / inspired by melfcc from Dan Ellis's rastamat package.
 
 using Compat
 
-## This function accepts a vector of sample values, below we will generalize to arrays, 
+## This function accepts a vector of sample values, below we will generalize to arrays,
 ## i.e., multichannel data
-## Recoded from rastamat's "melfcc.m" (c) Dan Ellis. 
+## Recoded from rastamat's "melfcc.m" (c) Dan Ellis.
 ## Defaults here are HTK parameters, this is contrary to melfcc
-function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numcep=13, 
+function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numcep=13,
               lifterexp=-22, sumpower=false, preemph=0.97, dither=false, minfreq=0.0, maxfreq=sr/2,
               nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel, usecmp=false, modelorder=0)
     if (preemph!=0)
@@ -23,9 +23,9 @@ function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, s
     end
     if modelorder>0
         if dcttype != 1
-            ## error, unimplemented
+            error("Sorry, modelorder>0 and dcttype ≠ 1 is not implemented")
         end
-        # LPC analysis 
+        # LPC analysis
         lpcas = dolpc(aspec, modelorder)
         # cepstra
         cepstra = lpc2cep(lpcas, numcep)
@@ -34,9 +34,9 @@ function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, s
     end
     cepstra = lifter(cepstra, lifterexp)'
     meta = @Compat.Dict("sr" => sr, "wintime" => wintime, "steptime" => steptime, "numcep" => numcep,
-            "lifterexp" => lifterexp, "sumpower" => sumpower, "preemph" => preemph, 
+            "lifterexp" => lifterexp, "sumpower" => sumpower, "preemph" => preemph,
             "dither" => dither, "minfreq" => minfreq, "maxfreq" => maxfreq, "nbands" => nbands,
-            "bwidth" => bwidth, "dcttype" => dcttype, "fbtype" => fbtype, 
+            "bwidth" => bwidth, "dcttype" => dcttype, "fbtype" => fbtype,
             "usecmp" => usecmp, "modelorder" => modelorder)
     return (cepstra, pspec', meta)
 end
@@ -44,7 +44,7 @@ mfcc{T<:AbstractFloat}(x::Array{T}, sr::Real=16000.0...) = @parallel (tuple) for
 
 ## default feature configurations, :rasta, :htk, :spkid_toolkit, :wbspeaker
 ## With optional extra agrs... you can specify more options
-function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::AbstractFloat, defaults::Symbol; args...) 
+function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::AbstractFloat, defaults::Symbol; args...)
     if defaults==:rasta
         mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=40, dcttype=2, fbtype=:mel, args...)
     elseif defaults ∈ [:spkid_toolkit, :nbspeaker]
@@ -64,9 +64,9 @@ function deltas{T<:AbstractFloat}(x::Matrix{T}, w::Int=9)
     if nr==0 || w <= 1
         return x
     end
-    hlen = ifloor(w/2)
+    hlen = floor(Int, w/2)
     w = 2hlen+1                 # make w odd
-    win = [convert(T,hlen):-1:-hlen]
+    win = collect(convert(T, hlen):-1:-hlen)
     xx = vcat(repmat(x[1,:], hlen, 1), x, repmat(x[end,:], hlen, 1)) ## take care of boundaries
     norm = 3/(hlen*w*(hlen+1))
     return norm * filt(TFFilter(win, [1.]), xx)[2hlen+(1:nr),:]
@@ -80,19 +80,19 @@ function warpstats{T<:Real}(x::Matrix{T}, w::Int=399)
     nx, nfea = size(x)
     wl = min(w, nx)
     hw = (wl+1)/2
-    erfinvtab = sqrt(2)*erfinv([1:wl]/hw .- 1)
+    erfinvtab = √2 * erfinv(collect(1:wl)/hw .- 1)
     rank = similar(x, Int)
-    if nx<w
+    if nx < w
         index = sortperm(x, 1)
-        for j=1:nfea
-            rank[index[:,j],j] = [1:nx]
+        for j in 1:nfea
+            rank[index[:,j],j] = collect(1:nx)
         end
     else
-        for j=1:nfea            # operations in outer loop over columns, better for memory cache
-            for i=1:nx
-                s=max(1,i-iround(hw)+1)
-                e=s+w-1
-                if (e>nx)
+        for j in 1:nfea            # operations in outer loop over columns, better for memory cache
+            for i in 1:nx
+                s = max(1, i - round(Int, hw) + 1)
+                e = s+w-1
+                if e > nx
                     d = e-nx
                     e -= d
                     s -= d
@@ -127,7 +127,7 @@ function sdc{T<:AbstractFloat}(x::Matrix{T}, n::Int=7, d::Int=1, p::Int=3, k::In
     nx, nfea = size(x)
     n <= nfea || error("Not enough features for n")
     hnfill = (k-1)*p/2
-    nfill1, nfill2 = ifloor(hnfill), iceil(hnfill)
+    nfill1, nfill2 = floor(Int, hnfill), ceil(Int, hnfill)
     xx = vcat(zeros(eltype(x), nfill1, n), deltas(x[:,1:n], 2d+1), zeros(eltype(x), nfill2, n))
     y = zeros(eltype(x), nx, n*k)
     for (dt,offset) = zip(0:p:p*k-1,0:n:n*k-1)
@@ -135,4 +135,3 @@ function sdc{T<:AbstractFloat}(x::Matrix{T}, n::Int=7, d::Int=1, p::Int=3, k::In
     end
     return y
 end
-
