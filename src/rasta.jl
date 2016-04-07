@@ -239,7 +239,7 @@ function lifter{T<:AbstractFloat}(x::Array{T}, lift::Real=0.6, invs=false)
         if !isa(lift, Int)
             error("Negative lift must be interger")
         end
-        liftw = [1, (1 + lift/2*sin([1:ncep-1]π/lift))]
+        liftw = [1; (1 + lift/2*sin(collect(1:ncep-1)π/lift))]
     end
     if invs
         liftw = 1./liftw
