@@ -11,3 +11,7 @@ y = feaload("bl2.mfcc")
 
 @assert x == y
 
+z = warp(x)
+z = deltas(x)
+z = znorm(x)
+z = stmvn(x)

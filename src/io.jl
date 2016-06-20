@@ -5,6 +5,9 @@
 ## For compatibility reasons, we do not use JLD but encode everything in HDF5 types
 ## Is that a valid argument?  I don't know
 
+import FileIO
+import JLD
+
 ## encode non-HDF5 types in the key by adding type indicator---a poorman's solution
 HDF5.write(fd::HDF5File, s::AbstractString, b::Bool) = write(fd, string(s,":Bool"), Int8(b))
 HDF5.write(fd::HDF5File, s::AbstractString, sym::Symbol) = write(fd, string(s,":Symbol"), string(sym))
@@ -30,6 +33,9 @@ function feasave{T<:AbstractFloat}(file::AbstractString, x::Matrix{T}; meta::Dic
     end
     close(fd)
 end
+
+## JLD version of the same
+## FileIO.save(file::AbstractString, x::Matrix)
 
 ## the reverse encoding of Julia types.
 function retype(d::Dict)

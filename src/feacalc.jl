@@ -20,7 +20,7 @@ ncol(x) = size(x,2)
 
 ## compute features according to standard settingsm directly from a wav file.
 ## this does channel at the time.
-function feacalc(wavfile::AbstractString; method=:sox, augtype=:ddelta, normtype=:warp, sadtype=:energy, defaults=:nbspeaker, dynrange::Real=30., nwarp::Int=399, chan=:mono)
+function feacalc(wavfile::AbstractString; method=:wav, augtype=:ddelta, normtype=:warp, sadtype=:energy, defaults=:nbspeaker, dynrange::Real=30., nwarp::Int=399, chan=:mono)
     if method == :wav
         (x, sr) = wavread(wavfile)
     elseif method == :sox
@@ -118,9 +118,9 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
 end
 
 ## When called with a specific application in mind, call with two arguments
-function feacalc(wavfile::AbstractString, application::Symbol; chan=:mono, method=:sox)
+function feacalc(wavfile::AbstractString, application::Symbol; chan=:mono, method=:wav)
     if (application==:speaker)
-        feacalc(wavfile; defaults=:spkid_toolkit, chan=chan, method=method)
+        feacalc(wavfile; defaults=:nbspeaker, chan=chan, method=method)
     elseif application==:wbspeaker
         feacalc(wavfile; defaults=:wbspeaker, chan=chan, method=method)
     elseif (application==:language)

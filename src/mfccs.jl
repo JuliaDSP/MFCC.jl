@@ -74,7 +74,7 @@ end
 
 
 import Base.Sort.sortperm
-sortperm(a::Array,dim::Int) = mapslices(sortperm, a, dim)
+sortperm(a::Array, dim::Int) = mapslices(sortperm, a, dim)
 
 function warpstats{T<:Real}(x::Matrix{T}, w::Int=399)
     nx, nfea = size(x)
@@ -119,8 +119,40 @@ function WarpedArray(x::Matrix, w::Int)
     WarpedArray(rank, erfinvtab)
 end
 
-znorm(x::Array, dim::Int=1) = broadcast(/, broadcast(-, x, mean(x, dim)), std(x, dim))
+## mean and variance normalization
+znorm(x::Array, dim::Int=1) = znorm!(copy(x), dim)
 znorm!(x::Array, dim::Int=1) = broadcast!(/, x, broadcast!(-, x, x, mean(x, dim)), std(x, dim))
+
+## short-term mean and variance normalization
+function stmvn(x::Vector, w::Int=399)
+    y = similar(x)
+    hw = w ÷ 2 ## effectively makes `w` odd...
+    nx = length(x)
+    nx <= 1 && return x
+    ## initialize sum x and sum x^2
+    sx = (hw+1) * x[1]
+    sxx = (hw+1) * x[1] * x[1]
+    for i = 2:min(nx, hw+1)
+        sx += x[i]
+        sxx += x[i] * x[i]
+    end
+    if hw+1 > nx
+        sx += (hw+1 - nx) * x[nx]
+        sxx += (hw+1 - nx) * x[nx] * x[nx]
+    end
+    for i = 1:nx
+        μ = sx / w
+        σ = sqrt((sxx - μ * sx) / (w - 1))
+        y[i] = (x[i] - μ) / σ
+        mi = max(i - hw, 1)
+        ma = min(i + hw + 1, nx)
+        sx += x[ma] - x[mi]
+        sxx += x[ma] * x[ma] - x[mi] * x[mi]
+    end
+    return y
+end
+
+stmvn(m::Matrix, w::Int=399, dim::Int=1) = mapslices(x->stmvn(x, w), m, dim)
 
 ## Shifted Delta Coefficients by copying
 function sdc{T<:AbstractFloat}(x::Matrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7)
@@ -130,7 +162,7 @@ function sdc{T<:AbstractFloat}(x::Matrix{T}, n::Int=7, d::Int=1, p::Int=3, k::In
     nfill1, nfill2 = floor(Int, hnfill), ceil(Int, hnfill)
     xx = vcat(zeros(eltype(x), nfill1, n), deltas(x[:,1:n], 2d+1), zeros(eltype(x), nfill2, n))
     y = zeros(eltype(x), nx, n*k)
-    for (dt,offset) = zip(0:p:p*k-1,0:n:n*k-1)
+    for (dt,offset) = zip(0:p:p*k-1, 0:n:n*k-1)
         y[:,offset+(1:n)] = xx[dt+(1:nx),:]
     end
     return y
