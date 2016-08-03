@@ -67,8 +67,10 @@ function deltas{T<:AbstractFloat}(x::Matrix{T}, w::Int=9)
     hlen = floor(Int, w/2)
     w = 2hlen+1                 # make w odd
     win = collect(convert(T, hlen):-1:-hlen)
-    xx = vcat(repmat(x[1,:], hlen, 1), x, repmat(x[end,:], hlen, 1)) ## take care of boundaries
-    norm = 3/(hlen*w*(hlen+1))
+    x1 = reshape(x[1,:], 1, size(x,2)) ## julia v0.4 v0.5 changeover
+    xend = reshape(x[end,:], 1, size(x,2))
+    xx = vcat(repmat(x1, hlen, 1), x, repmat(xend, hlen, 1)) ## take care of boundaries
+    norm = 3 / (hlen * w * (hlen+1))
     return norm * filt(TFFilter(win, [1.]), xx)[2hlen+(1:nr),:]
 end
 
@@ -79,29 +81,29 @@ sortperm(a::Array, dim::Int) = mapslices(sortperm, a, dim)
 function warpstats{T<:Real}(x::Matrix{T}, w::Int=399)
     nx, nfea = size(x)
     wl = min(w, nx)
-    hw = (wl+1)/2
-    erfinvtab = √2 * erfinv(collect(1:wl)/hw .- 1)
+    hw = (wl+1) / 2
+    erfinvtab = √2 * erfinv(collect(1:wl) / hw .- 1)
     rank = similar(x, Int)
     if nx < w
         index = sortperm(x, 1)
         for j in 1:nfea
-            rank[index[:,j],j] = collect(1:nx)
+            rank[index[:,j], j] = collect(1:nx)
         end
     else
         for j in 1:nfea            # operations in outer loop over columns, better for memory cache
             for i in 1:nx
                 s = max(1, i - round(Int, hw) + 1)
-                e = s+w-1
+                e = s + w - 1
                 if e > nx
-                    d = e-nx
+                    d = e - nx
                     e -= d
                     s -= d
                 end
                 r = 1
                 for k in s:e
-                    r += x[i,j] > x[k,j]
+                    r += x[i, j] > x[k, j]
                 end
-                rank[i,j] = r
+                rank[i, j] = r
             end
         end
     end
@@ -128,7 +130,7 @@ function stmvn(x::Vector, w::Int=399)
     y = similar(x)
     hw = w ÷ 2 ## effectively makes `w` odd...
     nx = length(x)
-    nx <= 1 && return x
+    nx ≤ 1 && return x
     ## initialize sum x and sum x^2
     sx = (hw+1) * x[1]
     sxx = (hw+1) * x[1] * x[1]
@@ -158,7 +160,7 @@ stmvn(m::Matrix, w::Int=399, dim::Int=1) = mapslices(x->stmvn(x, w), m, dim)
 function sdc{T<:AbstractFloat}(x::Matrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7)
     nx, nfea = size(x)
     n <= nfea || error("Not enough features for n")
-    hnfill = (k-1)*p/2
+    hnfill = (k-1) * p / 2
     nfill1, nfill2 = floor(Int, hnfill), ceil(Int, hnfill)
     xx = vcat(zeros(eltype(x), nfill1, n), deltas(x[:,1:n], 2d+1), zeros(eltype(x), nfill2, n))
     y = zeros(eltype(x), nx, n*k)

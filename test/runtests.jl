@@ -15,3 +15,5 @@ z = warp(x)
 z = deltas(x)
 z = znorm(x)
 z = stmvn(x)
+
+println("Tests passed")

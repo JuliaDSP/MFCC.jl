@@ -152,7 +152,7 @@ function sad(wavfile::AbstractString, speechout::AbstractString, silout::Abstrac
     sp = sad(pspec, sr, dynrange=dynrange)
     sl = round(Int, meta["steptime"] * sr)
     xi = falses(size(x))
-    for (i in sp)
+    for i in sp
         xi[(i-1)*sl+(1:sl)] = true
     end
     y = x[find(xi)]
