@@ -4,3 +4,4 @@ Compat
 HDF5
 JLD
 WAV
+FileIO
