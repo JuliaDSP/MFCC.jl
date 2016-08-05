@@ -1,9 +1,9 @@
 ## (c) 2013--2014 David A. van Leeuwen, (c) 2005--2012, Dan Ellis
 
-## Freely adapted from Dan Ellis's rastamat package.  
-## We've kept routine names the same, but the interface has changed a bit. 
+## Freely adapted from Dan Ellis's rastamat package.
+## We've kept routine names the same, but the interface has changed a bit.
 
-## we haven't implemented rasta filtering, yet, in fact.  These routines are a minimum for 
+## we haven't implemented rasta filtering, yet, in fact.  These routines are a minimum for
 ## encoding HTK-style mfccs
 
 # powspec tested against octave with simple vectors
@@ -17,14 +17,14 @@ function powspec{T<:AbstractFloat}(x::Vector{T}, sr::Real=8000.0; wintime=0.025,
 
     y = spectrogram(x .* (1<<15), nwin, noverlap, nfft=nfft, fs=sr, window=window, onesided=true).power
     ## for compability with previous specgram method, remove the last frequency and scale
-    y = y[1:end-1,:] ##  * sumabs2(window) * sr / 2
-    y .+= dither * nwin / (sumabs2(window) * sr / 2)
+    y = y[1:end-1, :] ##  * sumabs2(window) * sr / 2
+    y .+= dither * nwin / (sumabs2(window) * sr / 2) ## OK with julia 0.5, 0.6 interpretation as broadcast!
 
     return y
 end
 
 # audspec tested against octave with simple vectors for all fbtypes
-function audspec{T<:AbstractFloat}(x::Array{T}, sr::Real=16000.0; nfilts=iceil(hz2bark(sr/2)), fbtype=:bark, 
+function audspec{T<:AbstractFloat}(x::Array{T}, sr::Real=16000.0; nfilts=iceil(hz2bark(sr/2)), fbtype=:bark,
                  minfreq=0., maxfreq=sr/2, sumpower=true, bwidth=1.0)
     (nfreqs,nframes)=size(x)
     nfft = 2(nfreqs-1)
@@ -73,13 +73,13 @@ end
 function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0, maxfreq=sr/2, htkmel=false, constamp=false)
     wts=zeros(nfilts, nfft)
     # Center freqs of each DFT bin
-    fftfreqs = collect(0:nfft-1) / nfft * sr; 
+    fftfreqs = collect(0:nfft-1) / nfft * sr;
     # 'Center freqs' of mel bands - uniformly spaced between limits
-    minmel = hz2mel(minfreq, htkmel); 
+    minmel = hz2mel(minfreq, htkmel);
     maxmel = hz2mel(maxfreq, htkmel);
     binfreqs = mel2hz(minmel .+ collect(0:(nfilts+1)) / (nfilts+1) * (maxmel-minmel), htkmel);
 ##    binbin = iround(binfrqs/sr*(nfft-1));
-    
+
     for i=1:nfilts
         fs = binfreqs[i+(0:2)]
         # scale by width
@@ -90,9 +90,9 @@ function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0, ma
         # then intersect them with each other and zero
         wts[i,:] = max(0, min(loslope, hislope))
     end
-    
+
     if !constamp
-        ## unclear what this does... 
+        ## unclear what this does...
         ## Slaney-style mel is scaled to be approx constant E per channel
         wts = broadcast(*, 2 ./ ((binfreqs[3:nfilts+2]) - binfreqs[1:nfilts]), wts)
     end
@@ -119,7 +119,7 @@ function hz2mel{T<:AbstractFloat}(f::Vector{T}, htk=false)
 end
 hz2mel(f::AbstractFloat, htk=false)  = hz2mel([f], htk)[1]
 
-function mel2hz{T<:AbstractFloat}(z::Vector{T}, htk=false) 
+function mel2hz{T<:AbstractFloat}(z::Vector{T}, htk=false)
     if htk
         f = 700*(10.^(z/2595)-1)
     else
@@ -166,8 +166,8 @@ function postaud{T<:AbstractFloat}(x::Matrix{T}, fmax::Real, fbtype=:bark, broad
     end
     return z
 end
-    
-function dolpc{T<:AbstractFloat}(x::Array{T}, modelorder::Int=8) 
+
+function dolpc{T<:AbstractFloat}(x::Array{T}, modelorder::Int=8)
     nbands, nframes = size(x)
     r = real(ifft(vcat(x, x[collect(nbands-1:-1:2),:]), 1)[1:nbands,:])
     # Find LPC coeffs by durbin
@@ -176,7 +176,7 @@ function dolpc{T<:AbstractFloat}(x::Array{T}, modelorder::Int=8)
     y ./= e
 end
 
-function lpc2cep{T<:AbstractFloat}(a::Array{T}, ncep::Int=0) 
+function lpc2cep{T<:AbstractFloat}(a::Array{T}, ncep::Int=0)
     nlpc, nc = size(a)
     order = nlpc - 1
     if ncep==0
@@ -257,7 +257,7 @@ function levinson{T<:Real}(acf::Vector{T}, p::Int)
     if length(acf)<1
         error("empty autocorrelation function")
     end
-    if p<0 
+    if p<0
         error("negative model order")
     end
     if p<100
@@ -286,7 +286,7 @@ function levinson{T<:Real}(acf::Vector{T}, p::Int)
     return (a,v)
 end
 
-function levinson{T<:Real}(acf::Array{T}, p::Int) 
+function levinson{T<:Real}(acf::Array{T}, p::Int)
     (nr,nc) = size(acf)
     a = zeros(p+1, nc)
     v = zeros(p+1, nc)
