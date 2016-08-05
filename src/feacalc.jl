@@ -1,17 +1,5 @@
 ## Feacalc.jl Full implementation of feature calculation for speech files.
-## (c) 2013 David A. van Leeuwen
-
-## This program is free software: you can redistribute it and/or modify
-##     it under the terms of the GNU General Public License as published by
-##     the Free Software Foundation, version 3 of the License.
-
-##     This program is distributed in the hope that it will be useful,
-##     but WITHOUT ANY WARRANTY; without even the implied warranty of
-##     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-##     GNU General Public License for more details.
-
-##     You should have received a copy of the GNU General Public License
-##     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+## (c) 2013, 2016 David A. van Leeuwen
 
 ## Feacalc.  Feature calculation as used for speaker and language recognition.
 
