@@ -1,5 +1,5 @@
 ## Feacalc.jl Full implementation of feature calculation for speech files.
-## (c) 2013, 2016 David A. van Leeuwen
+## (c) 2013-2016 David A. van Leeuwen
 
 ## Feacalc.  Feature calculation as used for speaker and language recognition.
 
@@ -8,7 +8,7 @@ ncol(x) = size(x,2)
 
 ## compute features according to standard settingsm directly from a wav file.
 ## this does channel at the time.
-function feacalc(wavfile::AbstractString; method=:wav, augtype=:ddelta, normtype=:warp, sadtype=:energy, defaults=:nbspeaker, dynrange::Real=30., nwarp::Int=399, chan=:mono)
+function feacalc(wavfile::AbstractString; method=:wav, kwargs...)
     if method == :wav
         (x, sr) = wavread(wavfile)
     elseif method == :sox
@@ -17,12 +17,12 @@ function feacalc(wavfile::AbstractString; method=:wav, augtype=:ddelta, normtype
         (x, sr) = sphread(wavfile)
     end
     sr = @compat Float64(sr)       # more reasonable sr
-    feacalc(x; augtype=augtype, normtype=normtype, sadtype=sadtype, defaults=defaults, dynrange=dynrange, nwarp=nwarp, chan=chan, sr=sr, source=wavfile)
+    feacalc(x; sr=sr, source=wavfile, kwargs...)
 end
 
 ## assume we have an array already
 function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dynrange::Real=30., nwarp::Int=399, chan=:mono, sr::AbstractFloat=8000.0, source=":array", defaults=:nbspeaker, mfccargs...)
-    if ndims(x)>1
+    if ndims(x) > 1
         nsamples, nchan = size(x)
         if chan == :mono
             x = vec(mean(x, 2))            # averave multiple channels for now
@@ -106,17 +106,15 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
 end
 
 ## When called with a specific application in mind, call with two arguments
-function feacalc(wavfile::AbstractString, application::Symbol; chan=:mono, method=:wav)
-    if (application==:speaker)
-        feacalc(wavfile; defaults=:nbspeaker, chan=chan, method=method)
+function feacalc(wavfile::AbstractString, application::Symbol; kwargs...)
+    if (application in [:speaker, :nbspeaker])
+        feacalc(wavfile; defaults=:nbspeaker, kwargs...)
     elseif application==:wbspeaker
-        feacalc(wavfile; defaults=:wbspeaker, chan=chan, method=method)
+        feacalc(wavfile; defaults=:wbspeaker, kwargs...)
     elseif (application==:language)
-        feacalc(wavfile; defaults=:rasta, nwarp=299, augtype=:sdc, chan=chan,
-                method=method)
+        feacalc(wavfile; defaults=:rasta, nwarp=299, augtype=:sdc, kwargs...)
     elseif (application==:diarization)
-        feacalc(wavfile; defaults=:rasta, sadtype=:none, normtype=:mvn,
-                augtype=:none, chan=chan, method=method)
+        feacalc(wavfile; defaults=:rasta, sadtype=:none, normtype=:mvn, augtype=:none, kwargs...)
     else
         error("Unknown application ", application)
     end

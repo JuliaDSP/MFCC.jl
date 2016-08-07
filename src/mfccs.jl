@@ -40,7 +40,7 @@ function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, s
             "usecmp" => usecmp, "modelorder" => modelorder)
     return (cepstra, pspec', meta)
 end
-mfcc{T<:AbstractFloat}(x::Array{T}, sr::Real=16000.0...) = @parallel (tuple) for i=1:size(x)[2] mfcc(x[:,i], sr...) end
+mfcc{T<:AbstractFloat}(x::Array{T}, sr::Real=16000.0; args...) = @parallel (tuple) for i=1:size(x)[2] mfcc(x[:,i], sr; args...) end
 
 ## default feature configurations, :rasta, :htk, :spkid_toolkit, :wbspeaker
 ## With optional extra agrs... you can specify more options
