@@ -163,8 +163,8 @@ end
 
 ## similarly using sphere tools
 function sphread(file)
-    nch = int(readall(`h_read -n -F channel_count $file`))
-    sr = int(readall(`h_read -n -F sample_rate $file`))
+    nch = Int(readall(`h_read -n -F channel_count $file`))
+    sr = Int(readall(`h_read -n -F sample_rate $file`))
     sphere = `w_decode -o pcm $file -` |> `h_strip - - `
     fd, proc = readsfrom(sphere)
     x = Int16[]
