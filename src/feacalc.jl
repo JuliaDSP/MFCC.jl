@@ -163,14 +163,14 @@ end
 
 ## similarly using sphere tools
 function sphread(file)
-    nch = Int(readall(`h_read -n -F channel_count $file`))
-    sr = Int(readall(`h_read -n -F sample_rate $file`))
-    sphere = `w_decode -o pcm $file -` |> `h_strip - - `
-    fd, proc = readsfrom(sphere)
-    x = Int16[]
-    while !eof(fd)
-        push!(x, read(fd, Int16))
+    nch = parse(Int, readstring(`h_read -n -F channel_count $file`))
+    sr = parse(Int, readstring(`h_read -n -F sample_rate $file`))
+    open(pipeline(`w_decode -o pcm $file -`, `h_strip - - `), "r") do fd
+        x = Int16[]
+        while !eof(fd)
+            push!(x, read(fd, Int16))
+        end
+        ns = length(x) ÷ nch
+        return reshape(x, nch, ns)' / (1<<15), sr
     end
-    ns = length(x) ÷ nch
-    reshape(x, nch, ns)' / (1<<15), sr
 end
