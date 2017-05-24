@@ -199,6 +199,9 @@ function lpc2cep{T<:AbstractFloat}(a::Array{T}, ncep::Int=0)
 end
 
 function spec2cep{T<:AbstractFloat}(spec::Array{T}, ncep::Int=13, dcttype::Int=2)
+    # no discrete cosine transform option
+    dcttype == -1 && return log(spec)
+
     (nr, nc) = size(spec)
     dctm = zeros(typeof(spec[1]), ncep, nr)
     if 1 < dcttype < 4          # type 2,3
