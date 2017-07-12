@@ -76,13 +76,18 @@ end
 
 
 import Base.Sort.sortperm
+
+@static if VERSION >= v"0.6"
+    using SpecialFunctions
+end
+
 sortperm(a::Array, dim::Int) = mapslices(sortperm, a, dim)
 
 function warpstats{T<:Real}(x::Matrix{T}, w::Int=399)
     nx, nfea = size(x)
     wl = min(w, nx)
     hw = (wl+1) / 2
-    erfinvtab = √2 * erfinv(collect(1:wl) / hw .- 1)
+    erfinvtab = √2 * map(erfinv, collect(1:wl) / hw .- 1)
     rank = similar(x, Int)
     if nx < w
         index = sortperm(x, 1)

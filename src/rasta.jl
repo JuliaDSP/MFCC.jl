@@ -17,8 +17,8 @@ function powspec{T<:AbstractFloat}(x::Vector{T}, sr::Real=8000.0; wintime=0.025,
 
     y = spectrogram(x .* (1<<15), nwin, noverlap, nfft=nfft, fs=sr, window=window, onesided=true).power
     ## for compability with previous specgram method, remove the last frequency and scale
-    y = y[1:end-1, :] ##  * sumabs2(window) * sr / 2
-    y .+= dither * nwin / (sumabs2(window) * sr / 2) ## OK with julia 0.5, 0.6 interpretation as broadcast!
+    y = y[1:end-1, :] ##  * sum(abs2, window) * sr / 2
+    y .+= dither * nwin / (sum(abs2, window) * sr / 2) ## OK with julia 0.5, 0.6 interpretation as broadcast!
 
     return y
 end
@@ -78,17 +78,17 @@ function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0, ma
     minmel = hz2mel(minfreq, htkmel);
     maxmel = hz2mel(maxfreq, htkmel);
     binfreqs = mel2hz(minmel .+ collect(0:(nfilts+1)) / (nfilts+1) * (maxmel-minmel), htkmel);
-##    binbin = iround(binfrqs/sr*(nfft-1));
 
     for i=1:nfilts
         fs = binfreqs[i+(0:2)]
         # scale by width
         fs = fs[2] .+ (fs .- fs[2])width
         # lower and upper slopes for all bins
-        loslope = (fftfreqs .- fs[1]) / diff(fs[1:2])
-        hislope = (fs[3] .- fftfreqs) / diff(fs[2:3])
+
+        loslope = (fftfreqs .- fs[1]) / diff(fs[1:2])[1]
+        hislope = (fs[3] .- fftfreqs) / diff(fs[2:3])[1]
         # then intersect them with each other and zero
-        wts[i,:] = max(0, min(loslope, hislope))
+        wts[i,:] = max.(0, min.(loslope, hislope))
     end
 
     if !constamp
@@ -113,7 +113,7 @@ function hz2mel{T<:AbstractFloat}(f::Vector{T}, htk=false)
         linpts = f .< brkfrq
         z = zeros(size(f))      # prevent InexactError() by making these Float64
         z[find(linpts)] = f[find(linpts)]/brkfrq ./ log(logstep)
-        z[find(!linpts)] = brkpt .+ log(f[find(!linpts)]/brkfrq) ./ log(logstep)
+        z[find(.!(linpts))] = brkpt .+ log.(f[find(.!(linpts))]/brkfrq) ./ log.(logstep)
     end
     return z
 end
@@ -131,7 +131,7 @@ function mel2hz{T<:AbstractFloat}(z::Vector{T}, htk=false)
         linpts = z .< brkpt
         f = similar(z)
         f[linpts] = f0 .+ fsp*z[linpts]
-        f[!linpts] = brkfrq .* exp(log(logstep)*(z[!linpts] .- brkpt))
+        f[.!(linpts)] = brkfrq .* exp.(log.(logstep)*(z[.!(linpts)] .- brkpt))
     end
     return f
 end
@@ -206,7 +206,7 @@ function spec2cep{T<:AbstractFloat}(spec::Array{T}, ncep::Int=13, dcttype::Int=2
     dctm = zeros(typeof(spec[1]), ncep, nr)
     if 1 < dcttype < 4          # type 2,3
         for i=1:ncep
-            dctm[i,:] = cos((i-1) * collect(1:2:2nr-1)π/(2nr)) * sqrt(2/nr)
+            dctm[i,:] = cos.((i-1) * collect(1:2:2nr-1)π/(2nr)) * sqrt(2/nr)
         end
         if dcttype==2
             dctm[1,:] /= sqrt(2)
@@ -224,7 +224,7 @@ function spec2cep{T<:AbstractFloat}(spec::Array{T}, ncep::Int=13, dcttype::Int=2
         end
         dctm[:,[1,nr]] /= 2
     end
-    return dctm*log(spec)
+    return dctm*log.(spec)
 end
 
 function lifter{T<:AbstractFloat}(x::Array{T}, lift::Real=0.6, invs=false)
