@@ -1,4 +1,4 @@
-sudo: false
+# sudo: false
 language: julia
 julia:
  - 0.6
