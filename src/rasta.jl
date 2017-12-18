@@ -199,6 +199,9 @@ function lpc2cep{T<:AbstractFloat}(a::Array{T}, ncep::Int=0)
 end
 
 function spec2cep{T<:AbstractFloat}(spec::Array{T}, ncep::Int=13, dcttype::Int=2)
+    # no discrete cosine transform option
+    dcttype == -1 && return log(spec)
+
     (nr, nc) = size(spec)
     dctm = zeros(typeof(spec[1]), ncep, nr)
     if 1 < dcttype < 4          # type 2,3
@@ -240,7 +243,7 @@ function lifter{T<:AbstractFloat}(x::Array{T}, lift::Real=0.6, invs=false)
             error("Negative lift must be interger")
         end
         lift = -lift            # strictly speaking unnecessary...
-        liftw = [1, (1 + lift/2*sin(collect(1:ncep-1)π/lift))]
+        liftw = vcat(1, (1 + lift/2*sin(collect(1:ncep-1)π/lift)))
     end
     if invs
         liftw = 1./liftw
