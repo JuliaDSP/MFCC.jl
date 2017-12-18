@@ -8,8 +8,8 @@
 
 # powspec tested against octave with simple vectors
 function powspec{T<:AbstractFloat}(x::Vector{T}, sr::Real=8000.0; wintime=0.025, steptime=0.01, dither=true)
-    nwin = @compat round(Integer, wintime*sr)
-    nstep = @compat round(Integer, steptime*sr)
+    nwin = round(Integer, wintime * sr)
+    nstep = round(Integer, steptime * sr)
 
     nfft = nextpow2(nwin)
     window = hamming(nwin)      # overrule default in specgram which is hanning in Octave
@@ -18,7 +18,7 @@ function powspec{T<:AbstractFloat}(x::Vector{T}, sr::Real=8000.0; wintime=0.025,
     y = spectrogram(x .* (1<<15), nwin, noverlap, nfft=nfft, fs=sr, window=window, onesided=true).power
     ## for compability with previous specgram method, remove the last frequency and scale
     y = y[1:end-1, :] ##  * sumabs2(window) * sr / 2
-    y .+= dither * nwin / (sumabs2(window) * sr / 2) ## OK with julia 0.5, 0.6 interpretation as broadcast!
+    y .+= dither * nwin / (sum(abs2, window) * sr / 2) ## OK with julia 0.5, 0.6 interpretation as broadcast!
 
     return y
 end
@@ -28,14 +28,14 @@ function audspec{T<:AbstractFloat}(x::Array{T}, sr::Real=16000.0; nfilts=iceil(h
                  minfreq=0., maxfreq=sr/2, sumpower=true, bwidth=1.0)
     (nfreqs,nframes)=size(x)
     nfft = 2(nfreqs-1)
-    if fbtype==:bark
+    if fbtype == :bark
         wts = fft2barkmx(nfft, nfilts, sr=sr, width=bwidth, minfreq=minfreq, maxfreq=maxfreq)
-    elseif fbtype==:mel
+    elseif fbtype == :mel
         wts = fft2melmx(nfft, nfilts, sr=sr, width=bwidth, minfreq=minfreq, maxfreq=maxfreq)
-    elseif fbtype==:htkmel
+    elseif fbtype == :htkmel
         wts = fft2melmx(nfft, nfilts, sr=sr, width=bwidth, minfreq=minfreq, maxfreq=maxfreq,
                         htkmel=true, constamp=true)
-    elseif fbtype==:fcmel
+    elseif fbtype == :fcmel
         wts = fft2melmx(nfft, nfilts, sr=sr, width=bwidth, minfreq=minfreq, maxfreq=maxfreq,
                         htkmel=true, constamp=false)
     else
@@ -45,7 +45,7 @@ function audspec{T<:AbstractFloat}(x::Array{T}, sr::Real=16000.0; nfilts=iceil(h
     if sumpower
         return wts * x
     else
-        return (wts * sqrt(x)).^2
+        return (wts * sqrt.(x)).^2
     end
 end
 
@@ -80,15 +80,15 @@ function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0, ma
     binfreqs = mel2hz(minmel .+ collect(0:(nfilts+1)) / (nfilts+1) * (maxmel-minmel), htkmel);
 ##    binbin = iround(binfrqs/sr*(nfft-1));
 
-    for i=1:nfilts
+    for i in 1:nfilts
         fs = binfreqs[i+(0:2)]
         # scale by width
         fs = fs[2] .+ (fs .- fs[2])width
         # lower and upper slopes for all bins
-        loslope = (fftfreqs .- fs[1]) / diff(fs[1:2])
-        hislope = (fs[3] .- fftfreqs) / diff(fs[2:3])
+        loslope = (fftfreqs .- fs[1]) / (fs[2] - fs[1])
+        hislope = (fs[3] .- fftfreqs) / (fs[3] - fs[2])
         # then intersect them with each other and zero
-        wts[i,:] = max(0, min(loslope, hislope))
+        wts[i,:] = max.(0, min.(loslope, hislope))
     end
 
     if !constamp
@@ -113,7 +113,7 @@ function hz2mel{T<:AbstractFloat}(f::Vector{T}, htk=false)
         linpts = f .< brkfrq
         z = zeros(size(f))      # prevent InexactError() by making these Float64
         z[find(linpts)] = f[find(linpts)]/brkfrq ./ log(logstep)
-        z[find(!linpts)] = brkpt .+ log(f[find(!linpts)]/brkfrq) ./ log(logstep)
+        z[find(.!linpts)] = brkpt .+ log.(f[find(.!linpts)]/brkfrq) ./ log(logstep)
     end
     return z
 end
@@ -131,7 +131,7 @@ function mel2hz{T<:AbstractFloat}(z::Vector{T}, htk=false)
         linpts = z .< brkpt
         f = similar(z)
         f[linpts] = f0 .+ fsp*z[linpts]
-        f[!linpts] = brkfrq .* exp(log(logstep)*(z[!linpts] .- brkpt))
+        f[.!linpts] = brkfrq .* exp.(log.(logstep)*(z[.!linpts] .- brkpt))
     end
     return f
 end
@@ -203,7 +203,7 @@ function spec2cep{T<:AbstractFloat}(spec::Array{T}, ncep::Int=13, dcttype::Int=2
     dctm = zeros(typeof(spec[1]), ncep, nr)
     if 1 < dcttype < 4          # type 2,3
         for i=1:ncep
-            dctm[i,:] = cos((i-1) * collect(1:2:2nr-1)π/(2nr)) * sqrt(2/nr)
+            dctm[i,:] = cos.((i-1) * collect(1:2:2nr-1)π/(2nr)) * sqrt(2/nr)
         end
         if dcttype==2
             dctm[1,:] /= sqrt(2)
@@ -217,11 +217,11 @@ function spec2cep{T<:AbstractFloat}(spec::Array{T}, ncep::Int=13, dcttype::Int=2
         dctm /= 2(nr+1)
     else                        # type 1
         for i=1:ncep
-            dctm[i,:] = cos((i-1) * collect(0:nr-1)π/(nr-1)) / (nr-1)
+            dctm[i,:] = cos.((i-1) * collect(0:nr-1)π/(nr-1)) / (nr-1)
         end
         dctm[:,[1,nr]] /= 2
     end
-    return dctm*log(spec)
+    return dctm * log.(spec)
 end
 
 function lifter{T<:AbstractFloat}(x::Array{T}, lift::Real=0.6, invs=false)
@@ -305,7 +305,7 @@ function toeplitz{T<:Real}(c::Vector{T}, r::Vector{T}=c)
     if nc==0 || nc==0
         return res
     end
-    if r[1]!=c[1]
+    if r[1] != c[1]
         ## warn
     end
     if typeof(c) <: Complex

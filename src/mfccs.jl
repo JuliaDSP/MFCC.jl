@@ -3,7 +3,7 @@
 
 ## Recoded from / inspired by melfcc from Dan Ellis's rastamat package.
 
-using Compat
+using SpecialFunctions
 
 ## This function accepts a vector of sample values, below we will generalize to arrays,
 ## i.e., multichannel data
@@ -12,7 +12,7 @@ using Compat
 function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numcep=13,
               lifterexp=-22, sumpower=false, preemph=0.97, dither=false, minfreq=0.0, maxfreq=sr/2,
               nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel, usecmp=false, modelorder=0)
-    if (preemph!=0)
+    if (preemph != 0)
         x = filt(TFFilter([1., -preemph], [1.]), x)
     end
     pspec = powspec(x, sr, wintime=wintime, steptime=steptime, dither=dither)
@@ -21,7 +21,7 @@ function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, s
         #  PLP-like weighting/compression
         aspec = postaud(aspec, maxfreq, fbtype)
     end
-    if modelorder>0
+    if modelorder > 0
         if dcttype != 1
             error("Sorry, modelorder>0 and dcttype ≠ 1 is not implemented")
         end
@@ -33,7 +33,7 @@ function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, s
         cepstra = spec2cep(aspec, numcep, dcttype)
     end
     cepstra = lifter(cepstra, lifterexp)'
-    meta = @Compat.Dict("sr" => sr, "wintime" => wintime, "steptime" => steptime, "numcep" => numcep,
+    meta = Dict("sr" => sr, "wintime" => wintime, "steptime" => steptime, "numcep" => numcep,
             "lifterexp" => lifterexp, "sumpower" => sumpower, "preemph" => preemph,
             "dither" => dither, "minfreq" => minfreq, "maxfreq" => maxfreq, "nbands" => nbands,
             "bwidth" => bwidth, "dcttype" => dcttype, "fbtype" => fbtype,
@@ -45,13 +45,13 @@ mfcc{T<:AbstractFloat}(x::Array{T}, sr::Real=16000.0; args...) = @parallel (tupl
 ## default feature configurations, :rasta, :htk, :spkid_toolkit, :wbspeaker
 ## With optional extra agrs... you can specify more options
 function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::AbstractFloat, defaults::Symbol; args...)
-    if defaults==:rasta
+    if defaults == :rasta
         mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=40, dcttype=2, fbtype=:mel, args...)
     elseif defaults ∈ [:spkid_toolkit, :nbspeaker]
         mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=30, dcttype=2, fbtype=:mel, minfreq=130., maxfreq=3900., numcep=20, args...)
     elseif defaults == :wbspeaker
         mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=63, dcttype=2, fbtype=:mel, minfreq=62.5, maxfreq=7937.5, numcep=20, args...)
-    elseif defaults==:htk
+    elseif defaults == :htk
         mfcc(x, sr; args...)
     else
         error("Unknown set of defaults ", defaults)
@@ -82,7 +82,7 @@ function warpstats{T<:Real}(x::Matrix{T}, w::Int=399)
     nx, nfea = size(x)
     wl = min(w, nx)
     hw = (wl+1) / 2
-    erfinvtab = √2 * erfinv(collect(1:wl) / hw .- 1)
+    erfinvtab = √2 * erfinv.(collect(1:wl) / hw .- 1)
     rank = similar(x, Int)
     if nx < w
         index = sortperm(x, 1)

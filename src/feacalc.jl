@@ -16,7 +16,7 @@ function feacalc(wavfile::AbstractString; method=:wav, kwargs...)
     elseif method == :sphere
         (x, sr) = sphread(wavfile)
     end
-    sr = @compat Float64(sr)       # more reasonable sr
+    sr = Float64(sr)       # more reasonable sr
     feacalc(x; sr=sr, source=wavfile, kwargs...)
 end
 
@@ -42,7 +42,7 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
         nsamples, nchan = length(x), 1
     end
     ## save some metadata
-    meta = @compat Dict("nsamples" => nsamples, "sr" => sr, "source" => source, "nchan" => nchan,
+    meta = Dict("nsamples" => nsamples, "sr" => sr, "source" => source, "nchan" => nchan,
             "chan" => chan)
     preemph = 0.97
     preemph ^= 16000. / sr
@@ -85,7 +85,7 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
     meta["sadtype"] = sadtype
     ## perform SAD
     m = m[speech,:]
-    meta["speech"] = @compat map(UInt32, speech)
+    meta["speech"] = map(UInt32, speech)
     meta["nframes"] , meta["nfea"] = size(m)
 
     ## normalization
@@ -102,7 +102,7 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
         end
         meta["normtype"] = normtype
     end
-    return(@compat map(Float32, m), meta, params)
+    return(map(Float32, m), meta, params)
 end
 
 ## When called with a specific application in mind, call with two arguments
@@ -143,7 +143,7 @@ function sad(wavfile::AbstractString, speechout::AbstractString, silout::Abstrac
     end
     y = x[find(xi)]
     wavwrite(y, speechout, Fs=sr, nbits=nbits, compression=WAVE_FORMAT_PCM)
-    y = x[find(!xi)]
+    y = x[find(.!xi)]
     wavwrite(y, silout, Fs=sr, nbits=nbits, compression=WAVE_FORMAT_PCM)
 end
 
