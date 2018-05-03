@@ -24,7 +24,7 @@ function powspec{T<:AbstractFloat}(x::Vector{T}, sr::Real=8000.0; wintime=0.025,
 end
 
 # audspec tested against octave with simple vectors for all fbtypes
-function audspec{T<:AbstractFloat}(x::Array{T}, sr::Real=16000.0; nfilts=iceil(hz2bark(sr/2)), fbtype=:bark,
+function audspec{T<:AbstractFloat}(x::Array{T}, sr::Real=16000.0; nfilts=ceil(Int64,hz2bark(sr/2)), fbtype=:bark,
                  minfreq=0., maxfreq=sr/2, sumpower=true, bwidth=1.0)
     (nfreqs,nframes)=size(x)
     nfft = 2(nfreqs-1)
