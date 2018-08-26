@@ -6,7 +6,7 @@
 ## Is that a valid argument?  I don't know
 
 import FileIO
-import JLD
+import JLD2
 
 ## encode non-HDF5 types in the key by adding type indicator---a poorman's solution
 HDF5.write(fd::HDF5File, s::AbstractString, b::Bool) = write(fd, string(s,":Bool"), Int8(b))
@@ -18,7 +18,7 @@ HDF5.write(fd::HDF5File, s::AbstractString, ss::SubString) = write(fd, s, ascii(
 ## x: the MFCC data
 ## meta: a dict with parameters anout the data, nsamples, nframes, totnframes (before sad), ...
 ## params: a dict with parameters about the feature extraction itself.
-function feasave{T<:AbstractFloat}(file::AbstractString, x::Matrix{T}; meta::Dict=Dict(), params::Dict=Dict())
+function feasave(file::AbstractString, x::Matrix{T}; meta::Dict=Dict(), params::Dict=Dict()) where {T<:AbstractFloat}
     dir = dirname(file)
     if length(dir)>0 && !isdir(dir)
         mkpath(dir)

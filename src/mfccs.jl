@@ -4,14 +4,15 @@
 ## Recoded from / inspired by melfcc from Dan Ellis's rastamat package.
 
 using SpecialFunctions
+using Distributed
 
 ## This function accepts a vector of sample values, below we will generalize to arrays,
 ## i.e., multichannel data
 ## Recoded from rastamat's "melfcc.m" (c) Dan Ellis.
 ## Defaults here are HTK parameters, this is contrary to melfcc
-function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numcep=13,
+function mfcc(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numcep=13,
               lifterexp=-22, sumpower=false, preemph=0.97, dither=false, minfreq=0.0, maxfreq=sr/2,
-              nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel, usecmp=false, modelorder=0)
+              nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel, usecmp=false, modelorder=0) where {T<:AbstractFloat}
     if (preemph != 0)
         x = filt(TFFilter([1., -preemph], [1.]), x)
     end
@@ -40,11 +41,11 @@ function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, s
             "usecmp" => usecmp, "modelorder" => modelorder)
     return (cepstra, pspec', meta)
 end
-mfcc{T<:AbstractFloat}(x::Array{T}, sr::Real=16000.0; args...) = @parallel (tuple) for i=1:size(x)[2] mfcc(x[:,i], sr; args...) end
+mfcc(x::Array{T}, sr::Real=16000.0; args...) where {T<:AbstractFloat} = @distributed (tuple) for i=1:size(x)[2] mfcc(x[:,i], sr; args...) end
 
 ## default feature configurations, :rasta, :htk, :spkid_toolkit, :wbspeaker
 ## With optional extra agrs... you can specify more options
-function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::AbstractFloat, defaults::Symbol; args...)
+function mfcc(x::Vector{T}, sr::AbstractFloat, defaults::Symbol; args...) where {T<:AbstractFloat}
     if defaults == :rasta
         mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=40, dcttype=2, fbtype=:mel, args...)
     elseif defaults ∈ [:spkid_toolkit, :nbspeaker]
@@ -59,7 +60,7 @@ function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::AbstractFloat, defaults::Symbo
 end
 
 ## our features run down with time, this is essential for the use of DSP.filt()
-function deltas{T<:AbstractFloat}(x::Matrix{T}, w::Int=9)
+function deltas(x::Matrix{T}, w::Int=9) where {T<:AbstractFloat}
     (nr, nc) = size(x)
     if nr==0 || w <= 1
         return x
@@ -69,16 +70,16 @@ function deltas{T<:AbstractFloat}(x::Matrix{T}, w::Int=9)
     win = collect(convert(T, hlen):-1:-hlen)
     x1 = reshape(x[1,:], 1, size(x,2)) ## julia v0.4 v0.5 changeover
     xend = reshape(x[end,:], 1, size(x,2))
-    xx = vcat(repmat(x1, hlen, 1), x, repmat(xend, hlen, 1)) ## take care of boundaries
+    xx = vcat(repeat(x1, hlen, 1), x, repeat(xend, hlen, 1)) ## take care of boundaries
     norm = 3 / (hlen * w * (hlen+1))
-    return norm * filt(TFFilter(win, [1.]), xx)[2hlen+(1:nr),:]
+    return norm * filt(TFFilter(win, [1.]), xx)[2hlen .+ (1:nr),:]
 end
 
 
 import Base.Sort.sortperm
-sortperm(a::Array, dim::Int) = mapslices(sortperm, a, dim)
+sortperm(a::Array, dim::Int) = mapslices(sortperm, a, dims=dim)
 
-function warpstats{T<:Real}(x::Matrix{T}, w::Int=399)
+function warpstats(x::Matrix{T}, w::Int=399) where {T<:Real}
     nx, nfea = size(x)
     wl = min(w, nx)
     hw = (wl+1) / 2
@@ -110,11 +111,11 @@ function warpstats{T<:Real}(x::Matrix{T}, w::Int=399)
     return rank, erfinvtab
 end
 
-function warp{T<:Real}(x::Matrix{T}, w::Int=399)
+function warp(x::Matrix{T}, w::Int=399) where {T<:Real}
     rank, erfinvtab = warpstats(x, w)
     return erfinvtab[rank]
 end
-warp{T<:Real}(x::Vector{T}, w::Int=399) = warp(x'', w)
+warp(x::Vector{T}, w::Int=399) where {T<:Real} = warp(x'', w)
 
 function WarpedArray(x::Matrix, w::Int)
     rank, erfinvtab = warpstats(x, w)
@@ -123,7 +124,7 @@ end
 
 ## mean and variance normalization
 znorm(x::Array, dim::Int=1) = znorm!(copy(x), dim)
-znorm!(x::Array, dim::Int=1) = broadcast!(/, x, broadcast!(-, x, x, mean(x, dim)), std(x, dim))
+znorm!(x::Array, dim::Int=1) = broadcast!(/, x, broadcast!(-, x, x, mean(x, dims=dim)), std(x, dims=dim))
 
 ## short-term mean and variance normalization
 function stmvn(x::Vector, w::Int=399)
@@ -154,10 +155,10 @@ function stmvn(x::Vector, w::Int=399)
     return y
 end
 
-stmvn(m::Matrix, w::Int=399, dim::Int=1) = mapslices(x->stmvn(x, w), m, dim)
+stmvn(m::Matrix, w::Int=399, dim::Int=1) = mapslices(x->stmvn(x, w), m, dims=dim)
 
 ## Shifted Delta Coefficients by copying
-function sdc{T<:AbstractFloat}(x::Matrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7)
+function sdc(x::Matrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7) where {T<:AbstractFloat}
     nx, nfea = size(x)
     n <= nfea || error("Not enough features for n")
     hnfill = (k-1) * p / 2

@@ -14,6 +14,11 @@ using DSP
 using HDF5
 using WAV
 using SpecialFunctions ## erfinv
+using Statistics
+using LinearAlgebra
+if VERSION >= v"0.7.0-DEV.602"
+    using FFTW
+end
 
 include("rasta.jl")
 include("mfccs.jl")

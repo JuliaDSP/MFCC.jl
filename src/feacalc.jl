@@ -25,7 +25,7 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
     if ndims(x) > 1
         nsamples, nchan = size(x)
         if chan == :mono
-            x = vec(mean(x, 2))            # averave multiple channels for now
+            x = vec(mean(x, dims=2))            # averave multiple channels for now
         elseif in(chan, [:a, :b])
             channum = findin([:a, :b], [chan])
             x = vec(x[:,channum])
@@ -133,7 +133,7 @@ end
 function sad(wavfile::AbstractString, speechout::AbstractString, silout::AbstractString; dynrange::Float64=30.)
     (x, sr, nbits) = wavread(wavfile)
     sr = float64(sr)               # more reasonable sr
-    x = vec(mean(x, 2))            # averave multiple channels for now
+    x = vec(mean(x, dims=2))            # averave multiple channels for now
     (m, pspec, meta) = mfcc(x, sr; preemph=0)
     sp = sad(pspec, sr, dynrange=dynrange)
     sl = round(Int, meta["steptime"] * sr)

@@ -3,7 +3,6 @@
 ##
 ## Licensed under the MIT software license, see LICENSE.md
 
-using WAV
 using MFCC
 using SpecialFunctions
 
