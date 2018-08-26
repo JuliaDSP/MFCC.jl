@@ -7,11 +7,12 @@
 ## encoding HTK-style mfccs
 
 # powspec tested against octave with simple vectors
-function powspec{T<:AbstractFloat}(x::Vector{T}, sr::Real=8000.0; wintime=0.025, steptime=0.01, dither=true)
+
+function powspec(x::Vector{T}, sr::Real=8000.0; wintime=0.025, steptime=0.01, dither=true) where {T<:AbstractFloat}
     nwin = round(Integer, wintime * sr)
     nstep = round(Integer, steptime * sr)
 
-    nfft = nextpow2(nwin)
+    nfft = 2 .^ Integer((ceil(log2(nwin))))
     window = hamming(nwin)      # overrule default in specgram which is hanning in Octave
     noverlap = nwin - nstep
 
@@ -24,8 +25,8 @@ function powspec{T<:AbstractFloat}(x::Vector{T}, sr::Real=8000.0; wintime=0.025,
 end
 
 # audspec tested against octave with simple vectors for all fbtypes
-function audspec{T<:AbstractFloat}(x::Array{T}, sr::Real=16000.0; nfilts=iceil(hz2bark(sr/2)), fbtype=:bark,
-                 minfreq=0., maxfreq=sr/2, sumpower=true, bwidth=1.0)
+function audspec(x::Array{T}, sr::Real=16000.0; nfilts=iceil(hz2bark(sr/2)), fbtype=:bark,
+                 minfreq=0., maxfreq=sr/2, sumpower=true, bwidth=1.0) where {T<:AbstractFloat}
     (nfreqs,nframes)=size(x)
     nfft = 2(nfreqs-1)
     if fbtype == :bark
@@ -81,7 +82,7 @@ function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0, ma
 ##    binbin = iround(binfrqs/sr*(nfft-1));
 
     for i in 1:nfilts
-        fs = binfreqs[i+(0:2)]
+        fs = binfreqs[i .+ (0:2)]
         # scale by width
         fs = fs[2] .+ (fs .- fs[2])width
         # lower and upper slopes for all bins
@@ -97,13 +98,13 @@ function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0, ma
         wts = broadcast(*, 2 ./ ((binfreqs[3:nfilts+2]) - binfreqs[1:nfilts]), wts)
     end
     # Make sure 2nd half of DFT is zero
-    wts[:, (nfft>>1)+1:nfft] = 0.
+    wts[:, (nfft>>1)+1:nfft] .= 0.
     return wts
 end
 
-function hz2mel{T<:AbstractFloat}(f::Vector{T}, htk=false)
+function hz2mel(f::Vector{T}, htk=false) where {T<:AbstractFloat}
     if htk
-        return 2595 * log10.(1 + f/700)
+        return 2595 .* log10.(1 .+ f/700)
     else
         f0 = 0.0
         fsp = 200/3
@@ -119,9 +120,9 @@ function hz2mel{T<:AbstractFloat}(f::Vector{T}, htk=false)
 end
 hz2mel(f::AbstractFloat, htk=false)  = hz2mel([f], htk)[1]
 
-function mel2hz{T<:AbstractFloat}(z::Vector{T}, htk=false)
+function mel2hz(z::Vector{T}, htk=false) where {T<:AbstractFloat}
     if htk
-        f = 700 * (10.^(z/2595) - 1)
+        f = 700 .* (10 .^ (z ./ 2595) .- 1)
     else
         f0 = 0.0
         fsp = 200/3
@@ -136,7 +137,7 @@ function mel2hz{T<:AbstractFloat}(z::Vector{T}, htk=false)
     return f
 end
 
-function postaud{T<:AbstractFloat}(x::Matrix{T}, fmax::Real, fbtype=:bark, broaden=false)
+function postaud(x::Matrix{T}, fmax::Real, fbtype=:bark, broaden=false) where {T<:AbstractFloat}
     (nbands,nframes) = size(x)
     nfpts = nbands + 2broaden
     if fbtype == :bark
@@ -167,7 +168,7 @@ function postaud{T<:AbstractFloat}(x::Matrix{T}, fmax::Real, fbtype=:bark, broad
     return z
 end
 
-function dolpc{T<:AbstractFloat}(x::Array{T}, modelorder::Int=8)
+function dolpc(x::Array{T}, modelorder::Int=8) where {T<:AbstractFloat}
     nbands, nframes = size(x)
     r = real(ifft(vcat(x, x[collect(nbands-1:-1:2),:]), 1)[1:nbands, :])
     # Find LPC coeffs by durbin
@@ -176,7 +177,7 @@ function dolpc{T<:AbstractFloat}(x::Array{T}, modelorder::Int=8)
     y ./= e
 end
 
-function lpc2cep{T<:AbstractFloat}(a::Array{T}, ncep::Int=0)
+function lpc2cep(a::Array{T}, ncep::Int=0) where {T<:AbstractFloat}
     nlpc, nc = size(a)
     order = nlpc - 1
     if ncep == 0
@@ -198,7 +199,7 @@ function lpc2cep{T<:AbstractFloat}(a::Array{T}, ncep::Int=0)
     return c
 end
 
-function spec2cep{T<:AbstractFloat}(spec::Array{T}, ncep::Int=13, dcttype::Int=2)
+function spec2cep(spec::Array{T}, ncep::Int=13, dcttype::Int=2) where {T<:AbstractFloat}
     # no discrete cosine transform option
     dcttype == -1 && return log(spec)
 
@@ -227,7 +228,7 @@ function spec2cep{T<:AbstractFloat}(spec::Array{T}, ncep::Int=13, dcttype::Int=2
     return dctm * log.(spec)
 end
 
-function lifter{T<:AbstractFloat}(x::Array{T}, lift::Real=0.6, invs=false)
+function lifter(x::Array{T}, lift::Real=0.6, invs=false) where {T<:AbstractFloat}
     (ncep, nf) = size(x)
     if lift == 0
         return x
@@ -243,12 +244,13 @@ function lifter{T<:AbstractFloat}(x::Array{T}, lift::Real=0.6, invs=false)
             error("Negative lift must be interger")
         end
         lift = -lift            # strictly speaking unnecessary...
-        liftw = vcat(1, (1 + lift/2 * sin.(collect(1:ncep-1)π/lift)))
+        liftw = vcat(1, (1 .+ lift/2 * sin.(collect(1:ncep-1)π/lift)))
     end
     if invs
-        liftw = 1./liftw
+        liftw = 1 ./ liftw
     end
-    return broadcast(*, x, liftw)
+    y = broadcast(*, x, liftw)
+    return y
 end
 
 ## Freely after octave's implementation, by Paul Kienzle <pkienzle@users.sf.net>
@@ -256,7 +258,7 @@ end
 ## "You are welcome to move my octave code from GPL to MIT like core Julia."
 ## untested
 ## only returns a, v
-function levinson{T<:Real}(acf::Vector{T}, p::Int)
+function levinson(acf::Vector{T}, p::Int) where {T<:Real}
     if length(acf) < 1
         error("empty autocorrelation function")
     end
@@ -289,7 +291,7 @@ function levinson{T<:Real}(acf::Vector{T}, p::Int)
     return (a, v)
 end
 
-function levinson{T<:Real}(acf::Array{T}, p::Int)
+function levinson(acf::Array{T}, p::Int) where {T<:Real}
     (nr,nc) = size(acf)
     a = zeros(p+1, nc)
     v = zeros(p+1, nc)
@@ -301,7 +303,7 @@ end
 
 ## Freely after octave's implementation, ver 3.2.4, by jwe && jh
 ## skipped sparse implementation
-function toeplitz{T<:Real}(c::Vector{T}, r::Vector{T}=c)
+function toeplitz(c::Vector{T}, r::Vector{T}=c) where {T<:Real}
     nc = length(r)
     nr = length(c)
     res = zeros(typeof(c[1]), nr, nc)

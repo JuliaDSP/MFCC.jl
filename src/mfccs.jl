@@ -4,14 +4,16 @@
 ## Recoded from / inspired by melfcc from Dan Ellis's rastamat package.
 
 using SpecialFunctions
+using Distributed
 
 ## This function accepts a vector of sample values, below we will generalize to arrays,
 ## i.e., multichannel data
 ## Recoded from rastamat's "melfcc.m" (c) Dan Ellis.
 ## Defaults here are HTK parameters, this is contrary to melfcc
-function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numcep=13,
+function mfcc(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numcep=13,
               lifterexp=-22, sumpower=false, preemph=0.97, dither=false, minfreq=0.0, maxfreq=sr/2,
-              nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel, usecmp=false, modelorder=0)
+              nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel,
+              usecmp=false, modelorder=0) where {T<:AbstractFloat}
     if (preemph != 0)
         x = filt(TFFilter([1., -preemph], [1.]), x)
     end
@@ -32,7 +34,7 @@ function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, s
     else
         cepstra = spec2cep(aspec, numcep, dcttype)
     end
-    cepstra = lifter(cepstra, lifterexp)'
+    cepstra = Array(lifter(cepstra, lifterexp)')
     meta = Dict("sr" => sr, "wintime" => wintime, "steptime" => steptime, "numcep" => numcep,
             "lifterexp" => lifterexp, "sumpower" => sumpower, "preemph" => preemph,
             "dither" => dither, "minfreq" => minfreq, "maxfreq" => maxfreq, "nbands" => nbands,
@@ -40,11 +42,13 @@ function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::Real=16000.0; wintime=0.025, s
             "usecmp" => usecmp, "modelorder" => modelorder)
     return (cepstra, pspec', meta)
 end
-mfcc{T<:AbstractFloat}(x::Array{T}, sr::Real=16000.0; args...) = @parallel (tuple) for i=1:size(x)[2] mfcc(x[:,i], sr; args...) end
+
+mfcc(x::Array{T}, sr::Real=16000.0; args...) where {T<:AbstractFloat} = @distributed (tuple) for i=1:size(x)[2] mfcc(x[:,i], sr; args...) end
+
 
 ## default feature configurations, :rasta, :htk, :spkid_toolkit, :wbspeaker
 ## With optional extra agrs... you can specify more options
-function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::AbstractFloat, defaults::Symbol; args...)
+function mfcc(x::Vector{T}, sr::AbstractFloat, defaults::Symbol; args...) where {T<:AbstractFloat}
     if defaults == :rasta
         mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=40, dcttype=2, fbtype=:mel, args...)
     elseif defaults ∈ [:spkid_toolkit, :nbspeaker]
@@ -59,7 +63,7 @@ function mfcc{T<:AbstractFloat}(x::Vector{T}, sr::AbstractFloat, defaults::Symbo
 end
 
 ## our features run down with time, this is essential for the use of DSP.filt()
-function deltas{T<:AbstractFloat}(x::Matrix{T}, w::Int=9)
+function deltas(x::Matrix{T}, w::Int=9) where {T<:AbstractFloat}
     (nr, nc) = size(x)
     if nr==0 || w <= 1
         return x
@@ -78,7 +82,7 @@ end
 import Base.Sort.sortperm
 sortperm(a::Array, dim::Int) = mapslices(sortperm, a, dim)
 
-function warpstats{T<:Real}(x::Matrix{T}, w::Int=399)
+function warpstats(x::Matrix{T}, w::Int=399) where {T<:Real}
     nx, nfea = size(x)
     wl = min(w, nx)
     hw = (wl+1) / 2
@@ -110,11 +114,11 @@ function warpstats{T<:Real}(x::Matrix{T}, w::Int=399)
     return rank, erfinvtab
 end
 
-function warp{T<:Real}(x::Matrix{T}, w::Int=399)
+function warp(x::Matrix{T}, w::Int=399) where {T<:Real}
     rank, erfinvtab = warpstats(x, w)
     return erfinvtab[rank]
 end
-warp{T<:Real}(x::Vector{T}, w::Int=399) = warp(x'', w)
+warp(x::Vector{T}, w::Int=399) where {T<:Real} = warp(x'', w)
 
 function WarpedArray(x::Matrix, w::Int)
     rank, erfinvtab = warpstats(x, w)
@@ -157,7 +161,7 @@ end
 stmvn(m::Matrix, w::Int=399, dim::Int=1) = mapslices(x->stmvn(x, w), m, dim)
 
 ## Shifted Delta Coefficients by copying
-function sdc{T<:AbstractFloat}(x::Matrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7)
+function sdc(x::Matrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7) where {T<:AbstractFloat}
     nx, nfea = size(x)
     n <= nfea || error("Not enough features for n")
     hnfill = (k-1) * p / 2
