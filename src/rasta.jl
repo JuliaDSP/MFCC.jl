@@ -141,11 +141,11 @@ function postaud(x::Matrix{T}, fmax::Real, fbtype=:bark, broaden=false) where {T
     (nbands,nframes) = size(x)
     nfpts = nbands + 2broaden
     if fbtype == :bark
-        bandcfhz = bark2hz(linspace(0, hz2bark(fmax), nfpts))
+        bandcfhz = bark2hz(range(0, stop=hz2bark(fmax), length=nfpts))
     elseif fbtype == :mel
-        bandcfhz = mel2hz(linspace(0, hz2mel(fmax), nfpts))
+        bandcfhz = mel2hz(range(0, stop=hz2mel(fmax), length=nfpts))
     elseif fbtype == :htkmel || fbtype == :fcmel
-        bandcfhz = mel2hz(linspace(0, hz2mel(fmax,1), nfpts),1);
+        bandcfhz = mel2hz(range(0, stop=hz2mel(fmax,1), length=nfpts),1);
     else
         error("Unknown filterbank type")
     end
@@ -270,7 +270,7 @@ function levinson(acf::Vector{T}, p::Int) where {T<:Real}
         ## Kay & Marple Eqn (2.39)
         R = toeplitz(acf[1:p], conj(acf[1:p]))
         a = R \ -acf[2:p+1]
-        unshift!(a, 1)
+        pushfirst!(a, 1)
         v = real(a.*conj(acf[1:p+1]))
     else
         ## durbin-levinson [O(p^2), so significantly faster for large p]
@@ -286,7 +286,7 @@ function levinson(acf::Vector{T}, p::Int) where {T<:Real}
             v *= 1 - abs2(g)
             ref[t] = g
         end
-        unshift!(a, 1)
+        pushfirst!(a, 1)
     end
     return (a, v)
 end

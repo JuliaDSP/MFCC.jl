@@ -27,7 +27,7 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
         if chan == :mono
             x = vec(mean(x, dims=2))            # averave multiple channels for now
         elseif in(chan, [:a, :b])
-            channum = findin([:a, :b], [chan])
+            channum = findall(in([chan]), [:a, :b])
             x = vec(x[:,channum])
         elseif isa(chan, Integer)
             if !(chan in 1:nchan)
@@ -163,8 +163,8 @@ end
 
 ## similarly using sphere tools
 function sphread(file)
-    nch = parse(Int, readstring(`h_read -n -F channel_count $file`))
-    sr = parse(Int, readstring(`h_read -n -F sample_rate $file`))
+    nch = parse(Int, read(`h_read -n -F channel_count $file`, String))
+    sr = parse(Int, read(`h_read -n -F sample_rate $file`, String))
     open(pipeline(`w_decode -o pcm $file -`, `h_strip - - `), "r") do fd
         x = Int16[]
         while !eof(fd)
