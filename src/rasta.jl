@@ -224,6 +224,7 @@ function spec2cep{T<:AbstractFloat}(spec::Array{T}, ncep::Int=13, dcttype::Int=2
         end
         dctm[:, [1, nr]] /= 2
     end
+    spec = map(x -> x == 0 ? eps(x) : x, spec)
     return dctm * log.(spec)
 end
 
