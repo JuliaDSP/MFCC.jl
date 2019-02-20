@@ -113,8 +113,8 @@ function hz2mel(f::Vector{T}, htk=false) where {T<:AbstractFloat}
         logstep = exp(log(6.4)/27)
         linpts = f .< brkfrq
         z = zeros(size(f))      # prevent InexactError() by making these Float64
-        z[find(linpts)] = f[find(linpts)]/brkfrq ./ log(logstep)
-        z[find(.!linpts)] = brkpt .+ log.(f[find(.!linpts)]/brkfrq) ./ log(logstep)
+        z[findall(linpts)] = f[findall(linpts)]/brkfrq ./ log(logstep)
+        z[findall(.!linpts)] = brkpt .+ log.(f[findall(.!linpts)]/brkfrq) ./ log(logstep)
     end
     return z
 end

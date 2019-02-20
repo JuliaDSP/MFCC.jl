@@ -75,12 +75,12 @@ function deltas(x::Matrix{T}, w::Int=9) where {T<:AbstractFloat}
     xend = reshape(x[end,:], 1, size(x,2))
     xx = vcat(repeat(x1, hlen, 1), x, repeat(xend, hlen, 1)) ## take care of boundaries
     norm = 3 / (hlen * w * (hlen+1))
-    return norm * filt(TFFilter(win, [1.]), xx)[2hlen+(1:nr),:]
+    return norm * filt(TFFilter(win, [1.]), xx)[2hlen.+(1:nr),:]
 end
 
 
 import Base.Sort.sortperm
-sortperm(a::Array, dim::Int) = mapslices(sortperm, a, dim=dim)
+sortperm(a::Array, dim::Int) = mapslices(sortperm, a, dims=dim)
 
 function warpstats(x::Matrix{T}, w::Int=399) where {T<:Real}
     nx, nfea = size(x)
@@ -126,8 +126,8 @@ function WarpedArray(x::Matrix, w::Int)
 end
 
 ## mean and variance normalization
-znorm(x::Array, dim::Int=1) = znorm!(copy(x), dim=dim)
-znorm!(x::Array, dim::Int=1) = broadcast!(/, x, broadcast!(-, x, x, mean(x, dim=dim)), std(x, dim=dim))
+znorm(x::Array, dim::Int=1) = znorm!(copy(x), dims=dim)
+znorm!(x::Array, dim::Int=1) = broadcast!(/, x, broadcast!(-, x, x, mean(x, dims=dim)), std(x, dims=dim))
 
 ## short-term mean and variance normalization
 function stmvn(x::Vector, w::Int=399)
@@ -158,7 +158,7 @@ function stmvn(x::Vector, w::Int=399)
     return y
 end
 
-stmvn(m::Matrix, w::Int=399, dim::Int=1) = mapslices(x->stmvn(x, w), m, dim=dim)
+stmvn(m::Matrix, w::Int=399, dim::Int=1) = mapslices(x->stmvn(x, w), m, dims=dim)
 
 ## Shifted Delta Coefficients by copying
 function sdc(x::Matrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7) where {T<:AbstractFloat}
