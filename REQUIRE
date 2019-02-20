@@ -1,7 +1,7 @@
-julia 0.6
+julia 0.7
 DSP
 HDF5
-JLD
 WAV
 FileIO
 SpecialFunctions
+Distributed

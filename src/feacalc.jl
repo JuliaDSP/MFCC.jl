@@ -25,7 +25,7 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
     if ndims(x) > 1
         nsamples, nchan = size(x)
         if chan == :mono
-            x = vec(mean(x, 2))            # averave multiple channels for now
+            x = vec(mean(x, dims=2))            # averave multiple channels for now
         elseif in(chan, [:a, :b])
             channum = findin([:a, :b], [chan])
             x = vec(x[:,channum])
@@ -74,7 +74,7 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
             power = 10log10(sum(pspec[:,minfreqi:maxfreqi], 2))
 
             maxpow = maximum(power)
-            speech = find(power .> maxpow - dynrange)
+            speech = findall(power .> maxpow - dynrange)
             params["dynrange"] = dynrange
         elseif sadtype==:none
             speech = collect(1:nrow(m))
@@ -126,14 +126,14 @@ function sad(pspec::Matrix{Float64}, sr::Float64, method=:energy; dynrange::Floa
     maxfreqi = round(Int, 4000deltaf)
     power = 10log10(sum(pspec[:,minfreqi:maxfreqi], 2))
     maxpow = maximum(power)
-    speech = find(power .> maxpow - dynrange)
+    speech = findall(power .> maxpow - dynrange)
 end
 
 ## listen to SAD
 function sad(wavfile::AbstractString, speechout::AbstractString, silout::AbstractString; dynrange::Float64=30.)
     (x, sr, nbits) = wavread(wavfile)
     sr = float64(sr)               # more reasonable sr
-    x = vec(mean(x, 2))            # averave multiple channels for now
+    x = vec(mean(x, dims=2))            # averave multiple channels for now
     (m, pspec, meta) = mfcc(x, sr; preemph=0)
     sp = sad(pspec, sr, dynrange=dynrange)
     sl = round(Int, meta["steptime"] * sr)
@@ -141,9 +141,9 @@ function sad(wavfile::AbstractString, speechout::AbstractString, silout::Abstrac
     for i in sp
         xi[(i-1)*sl+(1:sl)] = true
     end
-    y = x[find(xi)]
+    y = x[findall(xi)]
     wavwrite(y, speechout, Fs=sr, nbits=nbits, compression=WAVE_FORMAT_PCM)
-    y = x[find(.!xi)]
+    y = x[findall(.!xi)]
     wavwrite(y, silout, Fs=sr, nbits=nbits, compression=WAVE_FORMAT_PCM)
 end
 
