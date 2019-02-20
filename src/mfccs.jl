@@ -126,7 +126,7 @@ function WarpedArray(x::Matrix, w::Int)
 end
 
 ## mean and variance normalization
-znorm(x::Array, dim::Int=1) = znorm!(copy(x), dims=dim)
+znorm(x::Array, dim::Int=1) = znorm!(copy(x), dim)
 znorm!(x::Array, dim::Int=1) = broadcast!(/, x, broadcast!(-, x, x, mean(x, dims=dim)), std(x, dims=dim))
 
 ## short-term mean and variance normalization
