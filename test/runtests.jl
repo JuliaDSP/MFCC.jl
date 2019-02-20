@@ -6,6 +6,7 @@
 using WAV
 using MFCC
 using SpecialFunctions
+using Statistics
 
 x, meta, params = feacalc("bl2.wav", normtype=:none, method=:wav, augtype=:none, sadtype=:none)
 y = feaload("bl2.mfcc")
