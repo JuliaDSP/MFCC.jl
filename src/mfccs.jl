@@ -73,7 +73,7 @@ function deltas(x::Matrix{T}, w::Int=9) where {T<:AbstractFloat}
     win = collect(convert(T, hlen):-1:-hlen)
     x1 = reshape(x[1,:], 1, size(x,2)) ## julia v0.4 v0.5 changeover
     xend = reshape(x[end,:], 1, size(x,2))
-    xx = vcat(repmat(x1, hlen, 1), x, repmat(xend, hlen, 1)) ## take care of boundaries
+    xx = vcat(repeat(x1, hlen, 1), x, repeat(xend, hlen, 1)) ## take care of boundaries
     norm = 3 / (hlen * w * (hlen+1))
     return norm * filt(TFFilter(win, [1.]), xx)[2hlen+(1:nr),:]
 end
