@@ -1,7 +1,7 @@
 name = "MFCC"
 uuid = "1b8316d5-81d4-5f6f-a99f-6dc343b691d6"
 authors = ["David van Leeuwen"]
-version = "0.3.0"
+version = "0.3.1"
 
 [deps]
 DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
