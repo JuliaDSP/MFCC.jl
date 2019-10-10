@@ -1,6 +1,6 @@
 # MFCC
 
-[![Build Status](https://travis-ci.org/davidavdav/MFCC.jl.svg?branch=master)](https://travis-ci.org/davidavdav/MFCC.jl) [![MFCC](http://pkg.julialang.org/badges/MFCC_0.3.svg)](http://pkg.julialang.org/?pkg=MFCC) [![MFCC](http://pkg.julialang.org/badges/MFCC_0.4.svg)](http://pkg.julialang.org/?pkg=MFCC) [![MFCC](http://pkg.julialang.org/badges/MFCC_0.5.svg)](http://pkg.julialang.org/?pkg=MFCC)
+[![Build Status](https://travis-ci.org/JuliaDSP/MFCC.jl.svg?branch=master)](https://travis-ci.org/JuliaDSP/MFCC.jl.svg?branch=master) 
 
 A package to compute Mel Frequency Cepstral Coefficients.
 
@@ -9,6 +9,30 @@ The essential routine is re-coded from Dan Ellis's rastamat package, and paramet
 Please note that the feature-vector array consists of a vertical stacking of row-vector features.  This is consistent with the sense of direction of, e.g., `Base.cov()`, but inconsistent with, e.g., `DSP.spectrogram()` or `Clustering.kmeans()`.
 
 `mfcc()` has many parameters, but most of these are set to defaults that _should_ mimick HTK default parameter (not thoroughly tested).
+
+## Feature extraction main routine
+
+```julia
+mfcc(x::Vector, sr=16000.0, defaults::Symbol; args...)
+```
+Extract MFCC features from the audio data in `x`, using parameter settings characterized by `defaults`
+- `:rasta`: defaults according to Dan Ellis' Rastamat package
+- `:htk`: defaults mimicking defaults of HTK (unverified)
+- `:nbspeaker`: narrow-band speaker recognition
+- `:wbspeaker`: wide-band speaker recognition
+
+The actual routine for MFCC computation has many parameters, these are basically the same parameters as in Dan Ellis's rastamat package.
+
+```julia
+mfcc(x::Vector, sr=16000.0; wintime=0.025, steptime=0.01, numcep=13, lifterexp=-22, sumpower=false, preemph=0.97, dither=false, minfreq=0.0, maxfreq=sr/2, nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel, usecmp=false, modelorder=0)
+```
+
+  This is the main routine computing MFCCs.  `x` should be a 1D vector of `FloatingPoint` samples of speech, sampled at a frequency of `sr`.  Every `steptime` seconds, a frame of duration `wintime` is analysed.  The log energy in a filterbank of `nbands` bins is computed, and a cepstral (discrete cosine transform) representaion is made, keeping only the first `numcep` coefficients (including log energy).  The result is a tuple of three values:
+
+ - a matrix of `numcep` columns with for each speech frame a row of MFCC coefficients
+ - the power spectrum computed with `DSP.spectrogram()` from which the MFCCs are computed
+ - a dictionary containing information about the parameters used for extracting the features.
+
 
 ## Pre-set feature extraction applications
 
@@ -65,30 +89,6 @@ The `sad` parameter controls if Speech Activity Detection is carried out on the 
 - `:energy`: apply energy based SAD, omitting frames with an energy less than `dynrange` below the maximum energy of the file.
 
 The various applications actually have somewhat different parameter settings for the basic MFCC feature extraction, see the `defaults` parameter of `mfcc()` below.
-
-## Feature extraction main routine
-
-```julia
-mfcc(x::Vector, sr=16000.0, defaults::Symbol; args...)
-```
-Extract MFCC features from the audio data in `x`, using parameter settings characterized by `defaults`
-- `:rasta`: defaults according to Dan Ellis' Rastamat package
-- `:htk`: defaults mimicking defaults of HTK (unverified)
-- `:nbspeaker`: narrow-band speaker recognition
-- `:wbspeaker`: wide-band speaker recognition
-
-The actual routine for MFCC computation has many parameters, these are basically the same parameters as in Dan Ellis's rastamat package.
-
-```julia
-mfcc(x::Vector, sr=16000.0; wintime=0.025, steptime=0.01, numcep=13, lifterexp=-22, sumpower=false, preemph=0.97, dither=false, minfreq=0.0, maxfreq=sr/2, nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel, usecmp=false, modelorder=0)
-```
-
-  This is the main routine computing MFCCs.  `x` should be a 1D vector of `FloatingPoint` samples of speech, sampled at a frequency of `sr`.  Every `steptime` seconds, a frame of duration `wintime` is analysed.  The log energy in a filterbank of `nbands` bins is computed, and a cepstral (discrete cosine transform) representaion is made, keeping only the first `numcep` coefficients (including log energy).  The result is a tuple of three values:
-
- - a matrix of `numcep` columns with for each speech frame a row of MFCC coefficients
- - the power spectrum computed with `DSP.spectrogram()` from which the MFCCs are computed
- - a dictionary containing information about the parameters used for extracting the features.
-
 
 ### Feature warping, or short-time Gaussianization (Jason Pelecanos)
 ```julia
