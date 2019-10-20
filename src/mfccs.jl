@@ -15,7 +15,7 @@ function mfcc(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numc
               nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel,
               usecmp=false, modelorder=0) where {T<:AbstractFloat}
     if (preemph != 0)
-        x = filt(TFFilter([1., -preemph], [1.]), x)
+        x = filt(PolynomialRatio([1., -preemph], [1.]), x)
     end
     pspec = powspec(x, sr, wintime=wintime, steptime=steptime, dither=dither)
     aspec = audspec(pspec, sr, nfilts=nbands, fbtype=fbtype, minfreq=minfreq, maxfreq=maxfreq, sumpower=sumpower, bwidth=bwidth)
@@ -75,7 +75,7 @@ function deltas(x::Matrix{T}, w::Int=9) where {T<:AbstractFloat}
     xend = reshape(x[end,:], 1, size(x,2))
     xx = vcat(repeat(x1, hlen, 1), x, repeat(xend, hlen, 1)) ## take care of boundaries
     norm = 3 / (hlen * w * (hlen+1))
-    return norm * filt(TFFilter(win, [1.]), xx)[2hlen.+(1:nr),:]
+    return norm * filt(PolynomialRatio(win, [1.]), xx)[2hlen.+(1:nr),:]
 end
 
 
