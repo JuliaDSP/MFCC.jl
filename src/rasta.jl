@@ -8,6 +8,10 @@
 
 # powspec tested against octave with simple vectors
 
+using DSP
+using FFTW
+using LinearAlgebra
+
 function powspec(x::Vector{T}, sr::Real=8000.0; wintime=0.025, steptime=0.01, dither=true) where {T<:AbstractFloat}
     nwin = round(Integer, wintime * sr)
     nstep = round(Integer, steptime * sr)
@@ -25,9 +29,9 @@ function powspec(x::Vector{T}, sr::Real=8000.0; wintime=0.025, steptime=0.01, di
 end
 
 # audspec tested against octave with simple vectors for all fbtypes
-function audspec(x::Array{T}, sr::Real=16000.0; nfilts=iceil(hz2bark(sr/2)), fbtype=:bark,
+function audspec(x::Matrix{T}, sr::Real=16000.0; nfilts=ceil(Int, hz2bark(sr/2)), fbtype=:bark,
                  minfreq=0., maxfreq=sr/2, sumpower=true, bwidth=1.0) where {T<:AbstractFloat}
-    (nfreqs,nframes)=size(x)
+    nfreqs, nframes = size(x)
     nfft = 2(nfreqs-1)
     if fbtype == :bark
         wts = fft2barkmx(nfft, nfilts, sr=sr, width=bwidth, minfreq=minfreq, maxfreq=maxfreq)
@@ -56,29 +60,29 @@ function fft2barkmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0., ma
     nyqbark = hz2bark(maxfreq) - minbark
     wts=zeros(nfilts, nfft)
     stepbark = nyqbark/(nfilts-1)
-    binbarks=hz2bark([0:hnfft]*sr/nfft)
+    binbarks = hz2bark.((0:hnfft) * sr / nfft)
     for i in 1:nfilts
-        midbark = minbark + (i-1)*stepbark
-        lof = (binbarks - midbark)/width - 0.5
-        hif = (binbarks - midbark)/width + 0.5
-        logwts = min(0, hif, -2.5lof)
+        midbark = minbark + (i-1) * stepbark
+        lof = (binbarks .- midbark) / width .- 0.5
+        hif = (binbarks .- midbark) / width .+ 0.5
+        logwts = min.(0, hif, -2.5lof)
         wts[i, 1:1+hnfft] = 10.0.^logwts
     end
     return wts
 end
 
-function hz2bark(f)
-    return 6asinh(f/600)
-end
+## Hynek's formula   
+hz2bark(f) = 6asinh(f / 600)
+bark2hz(bark) = 600 * sinh(bark / 6)
 
 function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0, maxfreq=sr/2, htkmel=false, constamp=false)
-    wts=zeros(nfilts, nfft)
+    wts = zeros(nfilts, nfft)
     # Center freqs of each DFT bin
     fftfreqs = collect(0:nfft-1) / nfft * sr;
     # 'Center freqs' of mel bands - uniformly spaced between limits
     minmel = hz2mel(minfreq, htkmel);
     maxmel = hz2mel(maxfreq, htkmel);
-    binfreqs = mel2hz(minmel .+ collect(0:(nfilts+1)) / (nfilts+1) * (maxmel-minmel), htkmel);
+    binfreqs = mel2hz(minmel .+ collect(0:(nfilts+1)) / (nfilts + 1) * (maxmel - minmel), htkmel);
 ##    binbin = iround(binfrqs/sr*(nfft-1));
 
     for i in 1:nfilts
@@ -104,17 +108,17 @@ end
 
 function hz2mel(f::Vector{T}, htk=false) where {T<:AbstractFloat}
     if htk
-        return 2595 .* log10.(1 .+ f/700)
+        return 2595 .* log10.(1 .+ f / 700)
     else
         f0 = 0.0
         fsp = 200/3
         brkfrq = 1000.0
         brkpt = (brkfrq - f0) / fsp
-        logstep = exp(log(6.4)/27)
+        logstep = exp(log(6.4) / 27)
         linpts = f .< brkfrq
         z = zeros(size(f))      # prevent InexactError() by making these Float64
         z[findall(linpts)] = f[findall(linpts)]/brkfrq ./ log(logstep)
-        z[findall(.!linpts)] = brkpt .+ log.(f[findall(.!linpts)]/brkfrq) ./ log(logstep)
+        z[findall(.!linpts)] = brkpt .+ log.(f[findall(.!linpts)] / brkfrq) ./ log(logstep)
     end
     return z
 end
@@ -128,7 +132,7 @@ function mel2hz(z::Vector{T}, htk=false) where {T<:AbstractFloat}
         fsp = 200/3
         brkfrq = 1000.0
         brkpt = (brkfrq - f0) / fsp
-        logstep = exp(log(6.4)/27)
+        logstep = exp(log(6.4) / 27)
         linpts = z .< brkpt
         f = similar(z)
         f[linpts] = f0 .+ fsp * z[linpts]
@@ -141,11 +145,11 @@ function postaud(x::Matrix{T}, fmax::Real, fbtype=:bark, broaden=false) where {T
     (nbands,nframes) = size(x)
     nfpts = nbands + 2broaden
     if fbtype == :bark
-        bandcfhz = bark2hz(linspace(0, hz2bark(fmax), nfpts))
+        bandcfhz = bark2hz.(range(0, hz2bark(fmax), length=nfpts))
     elseif fbtype == :mel
-        bandcfhz = mel2hz(linspace(0, hz2mel(fmax), nfpts))
+        bandcfhz = mel2hz(range(0, hz2mel(fmax), length=nfpts))
     elseif fbtype == :htkmel || fbtype == :fcmel
-        bandcfhz = mel2hz(linspace(0, hz2mel(fmax,1), nfpts),1);
+        bandcfhz = mel2hz(range(0, hz2mel(fmax,1), length=nfpts),1);
     else
         error("Unknown filterbank type")
     end
@@ -154,23 +158,23 @@ function postaud(x::Matrix{T}, fmax::Real, fbtype=:bark, broaden=false) where {T
     # Hynek's magic equal-loudness-curve formula
     fsq = bandcfhz.^2
     ftmp = fsq + 1.6e5
-    eql = ((fsq./ftmp).^2) .* ((fsq + 1.44e6)./(fsq + 9.61e6))
+    eql = ((fsq ./ ftmp).^2) .* ((fsq + 1.44e6) ./ (fsq + 9.61e6))
     # weight the critical bands
     z = broadcast(*, eql, x)
     # cube root compress
     z .^= 0.33
     # replicate first and last band (because they are unreliable as calculated)
     if broaden
-        z = z[[1,1:nbands,nbands],:];
+        z = z[[1, 1:nbands, nbands], :];
     else
-        z = z[[2,2:(nbands-1),nbands-1],:]
+        z = z[[2, 2:(nbands-1), nbands-1], :]
     end
     return z
 end
 
 function dolpc(x::Array{T}, modelorder::Int=8) where {T<:AbstractFloat}
     nbands, nframes = size(x)
-    r = real(ifft(vcat(x, x[collect(nbands-1:-1:2),:]), 1)[1:nbands, :])
+    r = real(ifft(vcat(x, x[collect(nbands-1:-1:2), :]), 1)[1:nbands, :])
     # Find LPC coeffs by durbin
     y, e = levinson(r, modelorder)
     # Normalize each poly by gain
@@ -192,9 +196,9 @@ function lpc2cep(a::Array{T}, ncep::Int=0) where {T<:AbstractFloat}
     for n in 2:ncep
         sum = zero(T)
         for m in 2:n
-            sum += (n-m) * a[m,:] .* c[n-m+1, :]
+            sum += (n - m) * a[m, :] .* c[n - m + 1, :]
         end
-        c[n,:] = -a[n,:] - sum/(n-1)
+        c[n, :] = -a[n, :] - sum / (n - 1)
     end
     return c
 end
@@ -207,10 +211,10 @@ function spec2cep(spec::Array{T}, ncep::Int=13, dcttype::Int=2) where {T<:Abstra
     dctm = zeros(typeof(spec[1]), ncep, nr)
     if 1 < dcttype < 4          # type 2,3
         for i in 1:ncep
-            dctm[i, :] = cos.((i-1) * collect(1:2:2nr-1)π/(2nr)) * sqrt(2/nr)
+            dctm[i, :] = cos.((i - 1) * collect(1:2:2nr-1)π / (2nr)) * √(2/nr)
         end
         if dcttype == 2
-            dctm[1, :] /= sqrt(2)
+            dctm[1, :] /= √2
         end
     elseif dcttype == 4           # type 4
         for i in 1:ncep
@@ -218,10 +222,10 @@ function spec2cep(spec::Array{T}, ncep::Int=13, dcttype::Int=2) where {T<:Abstra
             dctm[i, 1] += 1
             dctm[i, nr] += (-1)^(i-1)
         end
-        dctm /= 2(nr+1)
+        dctm /= 2(nr + 1)
     else                        # type 1
         for i in 1:ncep
-            dctm[i, :] = cos.((i-1) * collect(0:nr-1)π/(nr-1)) / (nr-1)
+            dctm[i, :] = cos.((i-1) * collect(0:nr-1)π / (nr - 1)) / (nr - 1)
         end
         dctm[:, [1, nr]] /= 2
     end
@@ -244,7 +248,7 @@ function lifter(x::Array{T}, lift::Real=0.6, invs=false) where {T<:AbstractFloat
             error("Negative lift must be interger")
         end
         lift = -lift            # strictly speaking unnecessary...
-        liftw = vcat(1, (1 .+ lift/2 * sin.(collect(1:ncep-1)π/lift)))
+        liftw = vcat(1, (1 .+ lift/2 * sin.(collect(1:ncep-1)π / lift)))
     end
     if invs
         liftw = 1 ./ liftw
@@ -270,33 +274,33 @@ function levinson(acf::Vector{T}, p::Int) where {T<:Real}
         ## Kay & Marple Eqn (2.39)
         R = toeplitz(acf[1:p], conj(acf[1:p]))
         a = R \ -acf[2:p+1]
-        unshift!(a, 1)
+        pushfirst!(a, 1)
         v = real(a.*conj(acf[1:p+1]))
     else
         ## durbin-levinson [O(p^2), so significantly faster for large p]
         ## Kay & Marple Eqns (2.42-2.46)
         ref = zeros(p)
-        g = -acf[2]/acf[1]
+        g = -acf[2] / acf[1]
         a = [g]
-        v = real((1-abs2(g)) * acf[1])
+        v = real((1 - abs2(g)) * acf[1])
         ref[1] = g
         for t=2:p
-            g = -(acf[t+1] + dot(a,acf[t:-1:2])) / v
-            a = [a + g*conj(a[t-1:-1:1]), g]
+            g = -(acf[t+1] + a ⋅ acf[t:-1:2]) / v
+            a = [a + g * conj(a[t-1:-1:1]), g]
             v *= 1 - abs2(g)
             ref[t] = g
         end
-        unshift!(a, 1)
+        pushfirst!(a, 1)
     end
     return (a, v)
 end
 
 function levinson(acf::Array{T}, p::Int) where {T<:Real}
     (nr,nc) = size(acf)
-    a = zeros(p+1, nc)
-    v = zeros(p+1, nc)
-    for i=1:nc
-        (a[:,i],v[:,i]) = levinson(acf[:,i], p)
+    a = zeros(p + 1, nc)
+    v = zeros(p + 1, nc)
+    for i in 1:nc
+        a[:,i], v[:,i] = levinson(acf[:,i], p)
     end
     return (a, v)
 end

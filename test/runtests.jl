@@ -18,4 +18,8 @@ z = deltas(x)
 z = znorm(x)
 z = stmvn(x)
 
+x = randn(100000)
+p = powspec(x)
+a = audspec(p)
+
 println("Tests passed")
