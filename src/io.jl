@@ -6,6 +6,7 @@
 ## Is that a valid argument?  I don't know
 
 import FileIO
+using HDF5: HDF5File
 #import JLD
 
 ## encode non-HDF5 types in the key by adding type indicator---a poorman's solution

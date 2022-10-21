@@ -6,7 +6,6 @@
 using SpecialFunctions
 using Distributed
 using DSP
-using Memoize
 
 ## This function accepts a vector of sample values, below we will generalize to arrays,
 ## i.e., multichannel data
@@ -67,16 +66,16 @@ end
 ## our features run down with time, this is essential for the use of DSP.filt()
 function deltas(x::Matrix{T}, w::Int=9) where {T<:AbstractFloat}
     (nr, nc) = size(x)
-    if nr==0 || w <= 1
+    if nr == 0 || w <= 1
         return x
     end
     hlen = floor(Int, w/2)
-    w = 2hlen+1                 # make w odd
+    w = 2hlen + 1                 # make w odd
     win = collect(convert(T, hlen):-1:-hlen)
-    x1 = reshape(x[1,:], 1, size(x,2)) ## julia v0.4 v0.5 changeover
-    xend = reshape(x[end,:], 1, size(x,2))
+    x1 = reshape(x[1, :], 1, size(x, 2)) ## julia v0.4 v0.5 changeover
+    xend = reshape(x[end,:], 1, size(x, 2))
     xx = vcat(repeat(x1, hlen, 1), x, repeat(xend, hlen, 1)) ## take care of boundaries
-    norm = 3 / (hlen * w * (hlen+1))
+    norm = 3 / (hlen * w * (hlen + 1))
     return norm * filt(PolynomialRatio(win, [1.]), xx)[2hlen .+ (1:nr), :]
 end
 
@@ -84,7 +83,14 @@ end
 import Base.Sort.sortperm
 sortperm(a::Array, dim::Int) = mapslices(sortperm, a, dims=dim)
 
-@memoize erfinvtab(wl::Int) = √2 * erfinv.(2collect(1:wl) / (wl + 1) .- 1)
+erfinvtabs = Dict{Int,Vector{Float64}}()
+function erfinvtab(wl::Int)
+    global erfinvtabs
+    if wl ∉ keys(erfinvtabs)
+        erfinvtabs[wl] = √2 * erfinv.(2collect(1:wl) / (wl + 1) .- 1)
+    end
+    return erfinvtabs[wl]
+end
 
 function warpstats(x::Matrix{T}, w::Int=399) where {T<:Real}
     nx, nfea = size(x)

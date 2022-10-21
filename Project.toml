@@ -10,13 +10,18 @@ FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-Memoize = "c03570c3-d221-55d1-a50c-7939bbd78826"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 WAV = "8149f6b0-98f6-5db9-b78f-408fbbb8ef88"
 
 [compat]
-julia = "≥ 0.7.0"
+julia = "1"
+DSP = "0.6"
+FFTW = "1"
+FileIO = "1"
+HDF5 = "0.12"
+SpecialFunctions = "0.8"
+WAV = "1"
 
 [extras]
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
