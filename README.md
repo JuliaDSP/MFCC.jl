@@ -1,6 +1,6 @@
 # MFCC
 
-[![Build Status](https://travis-ci.org/JuliaDSP/MFCC.jl.svg?branch=master)](https://travis-ci.org/JuliaDSP/MFCC.jl.svg?branch=master) 
+[![CI](https://github.com/JuliaDSP/MFCC.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/JuliaDSP/MFCC.jl/actions/workflows/CI.yml)
 
 A package to compute Mel Frequency Cepstral Coefficients.
 
