@@ -3,7 +3,7 @@
 
 ## Recoded from / inspired by melfcc from Dan Ellis's rastamat package.
 
-using SpecialFunctions
+using SpecialFunctions: erfinv
 using Distributed
 using DSP
 

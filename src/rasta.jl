@@ -58,8 +58,8 @@ function fft2barkmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0., ma
     hnfft = nfft >> 1
     minbark = hz2bark(minfreq)
     nyqbark = hz2bark(maxfreq) - minbark
-    wts=zeros(nfilts, nfft)
-    stepbark = nyqbark/(nfilts-1)
+    wts = zeros(nfilts, nfft)
+    stepbark = nyqbark / (nfilts-1)
     binbarks = hz2bark.((0:hnfft) * sr / nfft)
     for i in 1:nfilts
         midbark = minbark + (i-1) * stepbark
@@ -72,7 +72,7 @@ function fft2barkmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0., ma
 end
 
 ## Hynek's formula   
-hz2bark(f) = 6asinh(f / 600)
+hz2bark(f) = 6 * asinh(f / 600)
 bark2hz(bark) = 600 * sinh(bark / 6)
 
 function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0, maxfreq=sr/2, htkmel=false, constamp=false)
@@ -111,7 +111,7 @@ function hz2mel(f::Vector{T}, htk=false) where {T<:AbstractFloat}
         return 2595 .* log10.(1 .+ f / 700)
     else
         f0 = 0.0
-        fsp = 200/3
+        fsp = 200 / 3
         brkfrq = 1000.0
         brkpt = (brkfrq - f0) / fsp
         logstep = exp(log(6.4) / 27)
@@ -129,7 +129,7 @@ function mel2hz(z::Vector{T}, htk=false) where {T<:AbstractFloat}
         f = 700 .* (10 .^ (z ./ 2595) .- 1)
     else
         f0 = 0.0
-        fsp = 200/3
+        fsp = 200 / 3
         brkfrq = 1000.0
         brkpt = (brkfrq - f0) / fsp
         logstep = exp(log(6.4) / 27)
@@ -207,14 +207,14 @@ function spec2cep(spec::Array{T}, ncep::Int=13, dcttype::Int=2) where {T<:Abstra
     # no discrete cosine transform option
     dcttype == -1 && return log(spec)
 
-    (nr, nc) = size(spec)
-    dctm = zeros(typeof(spec[1]), ncep, nr)
+    nr, nc = size(spec)
+    dctm = similar(spec, ncep, nr)
     if 1 < dcttype < 4          # type 2,3
         for i in 1:ncep
             dctm[i, :] = cos.((i - 1) * collect(1:2:2nr-1)π / (2nr)) * √(2/nr)
         end
         if dcttype == 2
-            dctm[1, :] /= √2
+            dctm[1, :] ./= √2
         end
     elseif dcttype == 4           # type 4
         for i in 1:ncep
@@ -225,7 +225,7 @@ function spec2cep(spec::Array{T}, ncep::Int=13, dcttype::Int=2) where {T<:Abstra
         dctm /= 2(nr + 1)
     else                        # type 1
         for i in 1:ncep
-            dctm[i, :] = cos.((i-1) * collect(0:nr-1)π / (nr - 1)) / (nr - 1)
+            dctm[i, :] = cos.((i-1) * collect(0:nr-1)π ./ (nr - 1)) ./ (nr - 1)
         end
         dctm[:, [1, nr]] /= 2
     end
