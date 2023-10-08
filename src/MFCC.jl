@@ -11,7 +11,6 @@ export feasave, feaload, feasize
 export feacalc
 
 using DSP
-using HDF5
 using WAV
 using SpecialFunctions ## erfinv
 using Statistics  

@@ -3,8 +3,9 @@
 
 ## Recoded from / inspired by melfcc from Dan Ellis's rastamat package.
 
-using SpecialFunctions
+using SpecialFunctions: erfinv
 using Distributed
+using DSP
 
 ## This function accepts a vector of sample values, below we will generalize to arrays,
 ## i.e., multichannel data
@@ -15,7 +16,7 @@ function mfcc(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numc
               nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel,
               usecmp=false, modelorder=0) where {T<:AbstractFloat}
     if (preemph != 0)
-        x = filt(TFFilter([1., -preemph], [1.]), x)
+        x = filt(PolynomialRatio([1., -preemph], [1.]), x)
     end
     pspec = powspec(x, sr, wintime=wintime, steptime=steptime, dither=dither)
     aspec = audspec(pspec, sr, nfilts=nbands, fbtype=fbtype, minfreq=minfreq, maxfreq=maxfreq, sumpower=sumpower, bwidth=bwidth)
@@ -65,28 +66,36 @@ end
 ## our features run down with time, this is essential for the use of DSP.filt()
 function deltas(x::Matrix{T}, w::Int=9) where {T<:AbstractFloat}
     (nr, nc) = size(x)
-    if nr==0 || w <= 1
+    if nr == 0 || w <= 1
         return x
     end
     hlen = floor(Int, w/2)
-    w = 2hlen+1                 # make w odd
+    w = 2hlen + 1                 # make w odd
     win = collect(convert(T, hlen):-1:-hlen)
-    x1 = reshape(x[1,:], 1, size(x,2)) ## julia v0.4 v0.5 changeover
-    xend = reshape(x[end,:], 1, size(x,2))
+    x1 = reshape(x[1, :], 1, size(x, 2)) ## julia v0.4 v0.5 changeover
+    xend = reshape(x[end,:], 1, size(x, 2))
     xx = vcat(repeat(x1, hlen, 1), x, repeat(xend, hlen, 1)) ## take care of boundaries
-    norm = 3 / (hlen * w * (hlen+1))
-    return norm * filt(TFFilter(win, [1.]), xx)[2hlen.+(1:nr),:]
+    norm = 3 / (hlen * w * (hlen + 1))
+    return norm * filt(PolynomialRatio(win, [1.]), xx)[2hlen .+ (1:nr), :]
 end
 
 
 import Base.Sort.sortperm
 sortperm(a::Array, dim::Int) = mapslices(sortperm, a, dims=dim)
 
+erfinvtabs = Dict{Int,Vector{Float64}}()
+function erfinvtab(wl::Int)
+    global erfinvtabs
+    if wl ∉ keys(erfinvtabs)
+        erfinvtabs[wl] = √2 * erfinv.(2collect(1:wl) / (wl + 1) .- 1)
+    end
+    return erfinvtabs[wl]
+end
+
 function warpstats(x::Matrix{T}, w::Int=399) where {T<:Real}
     nx, nfea = size(x)
     wl = min(w, nx)
     hw = (wl+1) / 2
-    erfinvtab = √2 * erfinv.(collect(1:wl) / hw .- 1)
     rank = similar(x, Int)
     if nx < w
         index = sortperm(x, 1)
@@ -111,7 +120,7 @@ function warpstats(x::Matrix{T}, w::Int=399) where {T<:Real}
             end
         end
     end
-    return rank, erfinvtab
+    return rank, erfinvtab(wl)
 end
 
 function warp(x::Matrix{T}, w::Int=399) where {T<:Real}
@@ -136,17 +145,17 @@ function stmvn(x::Vector, w::Int=399)
     nx = length(x)
     nx ≤ 1 && return x
     ## initialize sum x and sum x^2
-    sx = (hw+1) * x[1]
-    sxx = (hw+1) * x[1] * x[1]
-    for i = 2:min(nx, hw+1)
+    sx = (hw + 1) * x[1]
+    sxx = (hw + 1) * x[1] * x[1]
+    for i in 2:min(nx, hw + 1)
         sx += x[i]
         sxx += x[i] * x[i]
     end
-    if hw+1 > nx
-        sx += (hw+1 - nx) * x[nx]
-        sxx += (hw+1 - nx) * x[nx] * x[nx]
+    if hw + 1 > nx
+        sx += (hw + 1 - nx) * x[nx]
+        sxx += (hw + 1 - nx) * x[nx] * x[nx]
     end
-    for i = 1:nx
+    for i in 1:nx
         μ = sx / w
         σ = sqrt((sxx - μ * sx) / (w - 1))
         y[i] = (x[i] - μ) / σ
@@ -163,13 +172,13 @@ stmvn(m::Matrix, w::Int=399, dim::Int=1) = mapslices(x->stmvn(x, w), m, dims=dim
 ## Shifted Delta Coefficients by copying
 function sdc(x::Matrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7) where {T<:AbstractFloat}
     nx, nfea = size(x)
-    n <= nfea || error("Not enough features for n")
+    n ≤ nfea || error("Not enough features for n")
     hnfill = (k-1) * p / 2
     nfill1, nfill2 = floor(Int, hnfill), ceil(Int, hnfill)
     xx = vcat(zeros(eltype(x), nfill1, n), deltas(x[:,1:n], 2d+1), zeros(eltype(x), nfill2, n))
     y = zeros(eltype(x), nx, n*k)
-    for (dt,offset) = zip(0:p:p*k-1, 0:n:n*k-1)
-        y[:,offset+(1:n)] = xx[dt+(1:nx),:]
+    for (dt, offset) in zip(0:p:p*k-1, 0:n:n*k-1)
+        y[:, offset+(1:n)] = xx[dt+(1:nx), :]
     end
     return y
 end

@@ -5,13 +5,12 @@
 ## For compatibility reasons, we do not use JLD but encode everything in HDF5 types
 ## Is that a valid argument?  I don't know
 
-import FileIO
-#import JLD
+import HDF5
 
 ## encode non-HDF5 types in the key by adding type indicator---a poorman's solution
-HDF5.write(fd::HDF5File, s::AbstractString, b::Bool) = write(fd, string(s,":Bool"), Int8(b))
-HDF5.write(fd::HDF5File, s::AbstractString, sym::Symbol) = write(fd, string(s,":Symbol"), string(sym))
-HDF5.write(fd::HDF5File, s::AbstractString, ss::SubString) = write(fd, s, ascii(ss))
+HDF5.write(fd::HDF5.File, s::AbstractString, b::Bool) = write(fd, string(s,":Bool"), Int8(b))
+HDF5.write(fd::HDF5.File, s::AbstractString, sym::Symbol) = write(fd, string(s,":Symbol"), string(sym))
+HDF5.write(fd::HDF5.File, s::AbstractString, ss::SubString) = write(fd, s, ascii(ss))
 
 ## always save data in Float32
 ## the functiona arguments are the same as the output of feacalc
@@ -23,7 +22,7 @@ function feasave(file::AbstractString, x::Matrix{T}; meta::Dict=Dict(), params::
     if length(dir)>0 && !isdir(dir)
         mkpath(dir)
     end
-    fd = h5open(file, "w")
+    fd = HDF5.h5open(file, "w")
     fd["features/data"] = map(Float32, x)
     for (k,v) in meta
         fd[string("features/meta/", k)] = v
@@ -54,13 +53,13 @@ end
 
 ## Try to handle missing elements in the hdf5 file more gacefully
 function h5check(obj, name, content)
-    content ∈ names(obj) || error('"', name, '"', " does not contain ", '"', content, '"')
+    content ∈ HDF5.keys(obj) || error('"', name, '"', " does not contain ", '"', content, '"')
     obj[content]
 end
 
 ## Currently we always read the data in float64
 function feaload(file::AbstractString; meta=false, params=false)
-    h5open(file, "r") do fd
+    HDF5.h5open(file, "r") do fd
         f = h5check(fd, file, "features")
         fea = map(Float64, read(h5check(f, "features", "data")))
         if length(fea)==0           # "no data"
@@ -83,7 +82,7 @@ end
 
 ## helper function to quickly determine the size of a feature file
 function feasize(file::AbstractString)
-    h5open(file, "r") do fd
+    HDF5.h5open(file, "r") do fd
         f = h5check(fd, file, "features")
         size(h5check(f, "features", "data"))
     end
