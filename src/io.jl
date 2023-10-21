@@ -17,20 +17,20 @@ HDF5.write(fd::HDF5.File, s::AbstractString, ss::SubString) = write(fd, s, ascii
 ## x: the MFCC data
 ## meta: a dict with parameters anout the data, nsamples, nframes, totnframes (before sad), ...
 ## params: a dict with parameters about the feature extraction itself.
-function feasave(file::AbstractString, x::Matrix{T}; meta::Dict=Dict(), params::Dict=Dict()) where {T<:AbstractFloat}
+function feasave(file::AbstractString, x::AbstractMatrix{<:AbstractFloat}; meta::Dict=Dict(), params::Dict=Dict())
     dir = dirname(file)
-    if length(dir)>0 && !isdir(dir)
+    if !(isempty(dir) || isdir(dir))
         mkpath(dir)
     end
-    fd = HDF5.h5open(file, "w")
-    fd["features/data"] = map(Float32, x)
-    for (k,v) in meta
-        fd[string("features/meta/", k)] = v
+    HDF5.h5open(file, "w") do fd
+        fd["features/data"] = map(Float32, x)
+        for (k, v) in meta
+            fd[string("features/meta/", k)] = v
+        end
+        for (k, v) in params
+            fd[string("features/params/", k)] = v
+        end
     end
-    for (k,v) in params
-        fd[string("features/params/", k)] = v
-    end
-    close(fd)
 end
 
 ## JLD version of the same
@@ -39,11 +39,11 @@ end
 ## the reverse encoding of Julia types.
 function retype(d::Dict)
     r = Dict()
-    for (k,v) in d
-        if (m=match(r"^(.*):Bool$", k)) != nothing
-            r[m.captures[1]] = v>0
-        elseif (m=match(r"(.*):Symbol", k)) != nothing
-            r[m.captures[1]] = symbol(v)
+    for (k, v) in d
+        if (m=match(r"^(.*):Bool$", k)) !== nothing
+            r[m.captures[1]] = v > 0
+        elseif (m=match(r"(.*):Symbol", k)) !== nothing
+            r[m.captures[1]] = Symbol(v)
         else
             r[k] = v
         end
@@ -53,7 +53,7 @@ end
 
 ## Try to handle missing elements in the hdf5 file more gacefully
 function h5check(obj, name, content)
-    content ∈ HDF5.keys(obj) || error('"', name, '"', " does not contain ", '"', content, '"')
+    HDF5.haskey(obj, content) || error('"', name, '"', " does not contain ", '"', content, '"')
     obj[content]
 end
 
@@ -62,11 +62,11 @@ function feaload(file::AbstractString; meta=false, params=false)
     HDF5.h5open(file, "r") do fd
         f = h5check(fd, file, "features")
         fea = map(Float64, read(h5check(f, "features", "data")))
-        if length(fea)==0           # "no data"
+        if isempty(fea)             # "no data"
             m = read(h5check(f, "features", "meta"))
-            fea = zeros(0,m["nfea"])
+            fea = zeros(0, m["nfea"])
         end
-        if ! (meta || params)
+        if !(meta || params)
             return fea
         end
         res = Any[fea]
