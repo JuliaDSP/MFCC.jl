@@ -35,12 +35,12 @@ function feacalc(x::AbstractArray; augtype=:ddelta, normtype=:warp, sadtype=:ene
             x = x[:,channum]
         elseif chan isa Integer
             if !(chan in 1:nchan)
-                error("Bad channel specification: ", chan)
+                DomainError(chan, "Bad channel specification")
             end
             x = x[:,chan]
             chan = (:a, :b)[chan]
         else
-            error("Unknown channel specification: ", chan)
+            ArgumentError(string("Unknown channel specification: ", chan))
         end
     else
         nsamples, nchan = length(x), 1
@@ -113,7 +113,7 @@ function feacalc(wavfile::AbstractString, application::Symbol; kwargs...)
     elseif application == :diarization
         feacalc(wavfile; defaults=:rasta, sadtype=:none, normtype=:mvn, augtype=:none, kwargs...)
     else
-        error("Unknown application ", application)
+        DomainError(application, "Unknown application ")
     end
 end
 
@@ -125,8 +125,7 @@ function sad(pspec::AbstractMatrix{T}, sr::T, method=:energy; dynrange::T=30.) w
     summed_pspec = vec(sum(view(pspec, :, minfreqi:maxfreqi); dims=2))
     power = @. 10log10(summed_pspec)
     maxpow = maximum(power)
-    activity = power .> maxpow - dynrange
-    speech = findall(activity)
+    speech = findall(>(maxpow - dynrange), power)
     return speech
 end
 
@@ -136,7 +135,7 @@ function sad(wavfile::AbstractString, speechout::AbstractString, silout::Abstrac
     sr = Float64(sr)                            # more reasonable sr
     mx::Vector{Float64} = vec(mean(x; dims=2))  # average multiple channels for now
     m, pspec, meta = mfcc(mx, sr; preemph=0)
-    sp = sad(pspec, sr, dynrange=dynrange)
+    sp = sad(pspec, sr; dynrange=dynrange)
     sl = round(Int, meta["steptime"] * sr)
     xi = falses(axes(mx))
     for i in @view sp[begin:end-1]

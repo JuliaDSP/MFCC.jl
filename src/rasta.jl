@@ -45,7 +45,7 @@ function audspec(x::AbstractMatrix{<:AbstractFloat}, sr::Real=16000.0;
         wts = fft2melmx(nfft, nfilts, sr=sr, width=bwidth, minfreq=minfreq, maxfreq=maxfreq,
                         htkmel=true, constamp=false)
     else
-        error("Unknown filterbank type ", fbtype)
+        ArgumentError(string("Unknown filterbank type ", fbtype))
     end
     wts = wts[:, 1:nfreqs]
     if sumpower
@@ -90,7 +90,7 @@ function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0,
     wts = zeros(nfilts, nfft)
     lastind = (nfft>>1)
     # Center freqs of each DFT bin
-    fftfreqs = collect(0:lastind-1) / nfft * sr;
+    fftfreqs = collect((0:lastind-1) / nfft * sr);
     # 'Center freqs' of mel bands - uniformly spaced between limits
     minmel = hz2mel(minfreq, htkmel);
     maxmel = hz2mel(maxfreq, htkmel);
@@ -116,27 +116,24 @@ function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0,
     return wts
 end
 
-function hz2mel(f::AbstractVector{<:AbstractFloat}, htk::Bool=false)
+function hz2mel(f::AbstractFloat, htk::Bool=false)
     if htk
-        return @. 2595 * log10(1 + f / 700)
+        return 2595 * log10(1 + f / 700)
     else
         f0 = 0.0
         fsp = 200 / 3
         brkfrq = 1000.0
         brkpt = (brkfrq - f0) / fsp
         logstep = exp(log(6.4) / 27)
-        linpts = f .< brkfrq
-        z = zeros(axes(f))      # prevent InexactError() by making these Float64
-        @. z[linpts] = f[linpts] / brkfrq / log(logstep)
-        @. z[!linpts] = brkpt + log(f[!linpts] / brkfrq) / log(logstep)
+        linpt = f < brkfrq
+        z = linpt ? f / brkfrq / log(logstep) : brkpt + log(f / brkfrq) / log(logstep)
     end
     return z
 end
-hz2mel(f::AbstractFloat, htk::Bool=false)  = hz2mel([f], htk)[1]
 
 function mel2hz(z::AbstractFloat, htk::Bool=false)
     if htk
-        f = @. 700 * (10 ^ (z / 2595) - 1)
+        f = 700 * (10 ^ (z / 2595) - 1)
     else
         f0 = 0.0
         fsp = 200 / 3
@@ -159,7 +156,7 @@ function postaud(x::Matrix{T}, fmax::Real, fbtype=:bark, broaden=false) where {T
     elseif fbtype == :htkmel || fbtype == :fcmel
         bandcfhz = mel2hz.(range(0, stop=hz2mel(fmax, true), length=nfpts),1);
     else
-        error("Unknown filterbank type")
+        ArgumentError(string("Unknown filterbank type ", fbtype))
     end
     # Remove extremal bands (the ones that will be duplicated)
     bandcfhz = bandcfhz[1+broaden:nfpts-broaden];
@@ -249,13 +246,13 @@ function lifter(x::AbstractArray{<:AbstractFloat}, lift::Real=0.6, invs=false)
         return x
     elseif lift > 0
         if lift > 10
-            error("Lift number is too high (>10)")
+            DomainError(lift, "Lift number is too high (>10)")
         end
         liftw = pushfirst!((1:ncep-1).^lift, 1)
     else
         # Hack to support HTK liftering
         if !isa(lift, Integer)
-            error("Negative lift must be interger")
+            DomainError(lift, "Negative lift must be integer")
         end
         lift = -lift            # strictly speaking unnecessary...
         liftw = @. 1 + lift / 2 * sinpi((0:ncep-1) / lift)
@@ -273,11 +270,11 @@ end
 ## untested
 ## only returns a, v
 function levinson(acf::Vector{T}, p::Int) where {T<:Real}
-    if length(acf) < 1
-        error("empty autocorrelation function")
+    if isempty(acf)
+        ArgumentError("Empty autocorrelation function")
     end
     if p < 0
-        error("negative model order")
+        DomainError(p, "Negative model order")
     end
     if p < 100
         ## direct solution [O(p^3), but no loops so slightly faster for small p]

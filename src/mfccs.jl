@@ -27,7 +27,7 @@ function mfcc(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numc
     end
     if modelorder > 0
         if dcttype != 1
-            error("Sorry, modelorder>0 and dcttype ≠ 1 is not implemented")
+            ArgumentError("Sorry, modelorder>0 and dcttype ≠ 1 is not implemented")
         end
         # LPC analysis
         lpcas = dolpc(aspec, modelorder)
@@ -54,14 +54,14 @@ mfcc(x::AbstractMatrix{<:AbstractFloat}, sr::Real=16000.0; args...) = @distribut
 function mfcc(x::AbstractVector{<:AbstractFloat}, sr::AbstractFloat, defaults::Symbol; args...)
     if defaults == :rasta
         mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=40, dcttype=2, fbtype=:mel, args...)
-    elseif defaults ∈ [:spkid_toolkit, :nbspeaker]
+    elseif defaults ∈ (:spkid_toolkit, :nbspeaker)
         mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=30, dcttype=2, fbtype=:mel, minfreq=130., maxfreq=3900., numcep=20, args...)
     elseif defaults == :wbspeaker
         mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=63, dcttype=2, fbtype=:mel, minfreq=62.5, maxfreq=7937.5, numcep=20, args...)
     elseif defaults == :htk
         mfcc(x, sr; args...)
     else
-        error("Unknown set of defaults ", defaults)
+        ArgumentError(string("Unknown set of defaults ", defaults))
     end
 end
 
@@ -71,7 +71,7 @@ function deltas(x::AbstractMatrix{T}, w::Int=9) where {T<:AbstractFloat}
     if iszero(nr) || w <= 1
         return x
     end
-    hlen = floor(Int, w/2)
+    hlen = w ÷ 2
     w = 2hlen + 1                 # make w odd
     win = collect(convert(T, hlen):-1:-hlen)
     x1 = x[1:1, :]
@@ -83,7 +83,8 @@ function deltas(x::AbstractMatrix{T}, w::Int=9) where {T<:AbstractFloat}
     return delta_v
 end
 
-sortperm_along(a::AbstractArray, dim::Int) = (v=similar(a, Int, size(a, dim)); mapslices(x->sortperm!(v, x), a; dims=dim))
+sortperm_along(a::AbstractArray, dim::Int) =
+(v=similar(a, Int, size(a, dim)); mapslices(x->sortperm!(v, x), a; dims=dim))
 
 erfinvtabs = Dict{Int, Vector{Float64}}()
 function erfinvtab(wl::Int)
@@ -102,23 +103,21 @@ function warpstats(x::AbstractMatrix{<:Real}, w::Int=399)
     else
         rank = similar(x, Int)
         hw = round(Int, (wl+1) / 2)
-        for j in axes(x, 2)            # operations in outer loop over columns, better for memory cache
-            for i in 1:nx
-                s = max(1, i - hw + 1)
-                e = s + w - 1
-                if e > nx
-                    d = e - nx
-                    e -= d
-                    s -= d
-                end
-                r = 1
-                for k in s:e
-                    if x[i, j] > x[k, j]
-                        r += 1
-                    end
-                end
-                rank[i, j] = r
+        for j in axes(x, 2), i in 1:nx  # operations in outer loop over columns, better for memory cache
+            s = max(1, i - hw + 1)
+            e = s + w - 1
+            if e > nx
+                d = e - nx
+                e -= d
+                s -= d
             end
+            r = 1
+            for k in s:e
+                if x[i, j] > x[k, j]
+                    r += 1
+                end
+            end
+            rank[i, j] = r
         end
     end
     return rank, erfinvtab(wl)
@@ -145,7 +144,7 @@ function znorm!(x::AbstractArray, dim::Int=1)
 end
 
 ## short-term mean and variance normalization
-function stmvn(x::Vector, w::Int=399)
+function stmvn(x::AbstractVector, w::Int=399)
     y = similar(x)
     hw = w ÷ 2 ## effectively makes `w` odd...
     nx = length(x)
@@ -173,12 +172,12 @@ function stmvn(x::Vector, w::Int=399)
     return y
 end
 
-stmvn(m::Matrix, w::Int=399, dim::Int=1) = mapslices(x->stmvn(x, w), m, dims=dim)
+stmvn(m::AbstractMatrix, w::Int=399, dim::Int=1) = mapslices(x->stmvn(x, w), m; dims=dim)
 
 ## Shifted Delta Coefficients by copying
 function sdc(x::AbstractMatrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7) where {T<:AbstractFloat}
     nx, nfea = size(x)
-    n ≤ nfea || error("Not enough features for n")
+    n ≤ nfea || DomainError(n, "Not enough features for n")
     hnfill = (k-1) * p / 2
     nfill1, nfill2 = floor(Int, hnfill), ceil(Int, hnfill)
     xx = vcat(zeros(T, nfill1, n), deltas(x[:,1:n], 2d+1), zeros(T, nfill2, n))

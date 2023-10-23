@@ -51,7 +51,7 @@ function retype(d::Dict)
     r
 end
 
-## Try to handle missing elements in the hdf5 file more gacefully
+## Try to handle missing elements in the hdf5 file more gracefully
 function h5check(obj, name, content)
     HDF5.haskey(obj, content) || error('"', name, '"', " does not contain ", '"', content, '"')
     obj[content]
