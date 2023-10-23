@@ -12,14 +12,15 @@ using DSP
 ## Recoded from rastamat's "melfcc.m" (c) Dan Ellis.
 ## Defaults here are HTK parameters, this is contrary to melfcc
 function mfcc(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numcep=13,
-              lifterexp=-22, sumpower=false, preemph=0.97, dither=false, minfreq=0.0, maxfreq=sr/2,
-              nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel,
-              usecmp=false, modelorder=0) where {T<:AbstractFloat}
-    if (preemph != 0)
+              lifterexp=-22, preemph=0.97, minfreq=0.0, maxfreq=sr/2, nbands=20,
+              bwidth=1.0, dcttype=3, fbtype=:htkmel, modelorder=0, sumpower::Bool=false,
+              dither::Bool=false, usecmp::Bool=false) where {T<:AbstractFloat}
+    if !iszero(preemph)
         x = filt(PolynomialRatio([1., -preemph], [1.]), x)
     end
-    pspec = powspec(x, sr, wintime=wintime, steptime=steptime, dither=dither)
-    aspec = audspec(pspec, sr, nfilts=nbands, fbtype=fbtype, minfreq=minfreq, maxfreq=maxfreq, sumpower=sumpower, bwidth=bwidth)
+    pspec = powspec(x, sr; wintime=wintime, steptime=steptime, dither=dither)
+    aspec = audspec(pspec, sr; nfilts=nbands, fbtype=fbtype, minfreq=minfreq,
+                    maxfreq=maxfreq, sumpower=sumpower, bwidth=bwidth)
     if usecmp
         #  PLP-like weighting/compression
         aspec = postaud(aspec, maxfreq, fbtype)
@@ -44,12 +45,13 @@ function mfcc(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numc
     return (cepstra, pspec', meta)
 end
 
-mfcc(x::Array{T}, sr::Real=16000.0; args...) where {T<:AbstractFloat} = @distributed (tuple) for i=1:size(x)[2] mfcc(x[:,i], sr; args...) end
+mfcc(x::AbstractVector{<:AbstractFloat}, sr::Real=16000.0; args...) = mfcc(Vector(x), sr; args...)
+mfcc(x::AbstractMatrix{<:AbstractFloat}, sr::Real=16000.0; args...) = @distributed (tuple) for i in axes(x, 2) mfcc(x[:, i], sr; args...) end
 
 
 ## default feature configurations, :rasta, :htk, :spkid_toolkit, :wbspeaker
 ## With optional extra agrs... you can specify more options
-function mfcc(x::Vector{T}, sr::AbstractFloat, defaults::Symbol; args...) where {T<:AbstractFloat}
+function mfcc(x::AbstractVector{<:AbstractFloat}, sr::AbstractFloat, defaults::Symbol; args...)
     if defaults == :rasta
         mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=40, dcttype=2, fbtype=:mel, args...)
     elseif defaults ∈ [:spkid_toolkit, :nbspeaker]
@@ -64,48 +66,45 @@ function mfcc(x::Vector{T}, sr::AbstractFloat, defaults::Symbol; args...) where 
 end
 
 ## our features run down with time, this is essential for the use of DSP.filt()
-function deltas(x::Matrix{T}, w::Int=9) where {T<:AbstractFloat}
-    (nr, nc) = size(x)
-    if nr == 0 || w <= 1
+function deltas(x::AbstractMatrix{T}, w::Int=9) where {T<:AbstractFloat}
+    nr, nc = size(x)
+    if iszero(nr) || w <= 1
         return x
     end
     hlen = floor(Int, w/2)
     w = 2hlen + 1                 # make w odd
     win = collect(convert(T, hlen):-1:-hlen)
-    x1 = reshape(x[1, :], 1, size(x, 2)) ## julia v0.4 v0.5 changeover
-    xend = reshape(x[end,:], 1, size(x, 2))
-    xx = vcat(repeat(x1, hlen, 1), x, repeat(xend, hlen, 1)) ## take care of boundaries
+    x1 = x[1:1, :]
+    xend = x[end:end,:]
+    xx = vcat(repeat(x1, hlen), x, repeat(xend, hlen)) ## take care of boundaries
     norm = 3 / (hlen * w * (hlen + 1))
-    return norm * filt(PolynomialRatio(win, [1.]), xx)[2hlen .+ (1:nr), :]
+    delta_v = filt(PolynomialRatio(win, [1.]), xx)[2hlen .+ (1:nr), :]
+    @. delta_v *= norm
+    return delta_v
 end
 
+sortperm_along(a::AbstractArray, dim::Int) = (v=similar(a, Int, size(a, dim)); mapslices(x->sortperm!(v, x), a; dims=dim))
 
-import Base.Sort.sortperm
-sortperm(a::Array, dim::Int) = mapslices(sortperm, a, dims=dim)
-
-erfinvtabs = Dict{Int,Vector{Float64}}()
+erfinvtabs = Dict{Int, Vector{Float64}}()
 function erfinvtab(wl::Int)
     global erfinvtabs
-    if wl ∉ keys(erfinvtabs)
-        erfinvtabs[wl] = √2 * erfinv.(2collect(1:wl) / (wl + 1) .- 1)
+    if !haskey(erfinvtabs, wl)
+        erfinvtabs[wl] = @. √2 * erfinv(2(1:wl) / (wl + 1) - 1)
     end
     return erfinvtabs[wl]
 end
 
-function warpstats(x::Matrix{T}, w::Int=399) where {T<:Real}
-    nx, nfea = size(x)
+function warpstats(x::AbstractMatrix{<:Real}, w::Int=399)
+    nx = size(x, 1)
     wl = min(w, nx)
-    hw = (wl+1) / 2
-    rank = similar(x, Int)
     if nx < w
-        index = sortperm(x, 1)
-        for j in 1:nfea
-            rank[index[:,j], j] = collect(1:nx)
-        end
+        rank = sortperm_along(x, 1)
     else
-        for j in 1:nfea            # operations in outer loop over columns, better for memory cache
+        rank = similar(x, Int)
+        hw = round(Int, (wl+1) / 2)
+        for j in axes(x, 2)            # operations in outer loop over columns, better for memory cache
             for i in 1:nx
-                s = max(1, i - round(Int, hw) + 1)
+                s = max(1, i - hw + 1)
                 e = s + w - 1
                 if e > nx
                     d = e - nx
@@ -114,7 +113,9 @@ function warpstats(x::Matrix{T}, w::Int=399) where {T<:Real}
                 end
                 r = 1
                 for k in s:e
-                    r += x[i, j] > x[k, j]
+                    if x[i, j] > x[k, j]
+                        r += 1
+                    end
                 end
                 rank[i, j] = r
             end
@@ -123,20 +124,25 @@ function warpstats(x::Matrix{T}, w::Int=399) where {T<:Real}
     return rank, erfinvtab(wl)
 end
 
-function warp(x::Matrix{T}, w::Int=399) where {T<:Real}
+function warp(x::AbstractMatrix{<:Real}, w::Int=399)
     rank, erfinvtab = warpstats(x, w)
     return erfinvtab[rank]
 end
-warp(x::Vector{T}, w::Int=399) where {T<:Real} = warp(x'', w)
+warp(x::AbstractVector{<:Real}, w::Int=399) = warp(reshape(x, :, 1), w)
 
-function WarpedArray(x::Matrix, w::Int)
+function WarpedArray(x::AbstractMatrix{<:Real}, w::Int)
     rank, erfinvtab = warpstats(x, w)
     WarpedArray(rank, erfinvtab)
 end
 
 ## mean and variance normalization
-znorm(x::Array, dim::Int=1) = znorm!(copy(x), dim)
-znorm!(x::Array, dim::Int=1) = broadcast!(/, x, broadcast!(-, x, x, mean(x, dims=dim)), std(x, dims=dim))
+znorm(x::AbstractArray, dim::Int=1) = znorm!(copy(x), dim)
+function znorm!(x::AbstractArray, dim::Int=1)
+    mean_x = mean(x; dims=dim)
+    std_x = std(x; dims=dim)
+    @. x = (x - mean_x) / std_x
+    x
+end
 
 ## short-term mean and variance normalization
 function stmvn(x::Vector, w::Int=399)
@@ -170,15 +176,15 @@ end
 stmvn(m::Matrix, w::Int=399, dim::Int=1) = mapslices(x->stmvn(x, w), m, dims=dim)
 
 ## Shifted Delta Coefficients by copying
-function sdc(x::Matrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7) where {T<:AbstractFloat}
+function sdc(x::AbstractMatrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7) where {T<:AbstractFloat}
     nx, nfea = size(x)
     n ≤ nfea || error("Not enough features for n")
     hnfill = (k-1) * p / 2
     nfill1, nfill2 = floor(Int, hnfill), ceil(Int, hnfill)
-    xx = vcat(zeros(eltype(x), nfill1, n), deltas(x[:,1:n], 2d+1), zeros(eltype(x), nfill2, n))
-    y = zeros(eltype(x), nx, n*k)
+    xx = vcat(zeros(T, nfill1, n), deltas(x[:,1:n], 2d+1), zeros(T, nfill2, n))
+    y = zeros(T, nx, n*k)
     for (dt, offset) in zip(0:p:p*k-1, 0:n:n*k-1)
-        y[:, offset+(1:n)] = xx[dt+(1:nx), :]
+        y[:, offset.+(1:n)] = xx[dt.+(1:nx), :]
     end
     return y
 end

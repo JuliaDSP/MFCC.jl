@@ -3,38 +3,42 @@
 
 ## Feacalc.  Feature calculation as used for speaker and language recognition.
 
-nrow(x) = size(x,1)
-ncol(x) = size(x,2)
+nrow(x) = size(x, 1)
+ncol(x) = size(x, 2)
 
-## compute features according to standard settingsm directly from a wav file.
-## this does channel at the time.
+"""
+compute features according to standard settings directly from a wav file.
+this does channel at the time.
+"""
 function feacalc(wavfile::AbstractString; method=:wav, kwargs...)
-    if method == :wav
-        (x, sr) = wavread(wavfile)
+    x, sr = if method == :wav
+        wavread(wavfile)
     elseif method == :sox
-        (x, sr) = soxread(wavfile)
+        soxread(wavfile)
     elseif method == :sphere
-        (x, sr) = sphread(wavfile)
+        sphread(wavfile)
     end
     sr = Float64(sr)       # more reasonable sr
     feacalc(x; sr=sr, source=wavfile, kwargs...)
 end
 
 ## assume we have an array already
-function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dynrange::Real=30., nwarp::Int=399, chan=:mono, sr::AbstractFloat=8000.0, source=":array", defaults=:nbspeaker, mfccargs...)
+function feacalc(x::AbstractArray; augtype=:ddelta, normtype=:warp, sadtype=:energy,
+                 dynrange::Real=30., nwarp::Int=399, chan=:mono, sr::AbstractFloat=8000.0,
+                 source=":array", defaults=:nbspeaker, mfccargs...)
     if ndims(x) > 1
         nsamples, nchan = size(x)
         if chan == :mono
-            x = vec(mean(x, dims=2))            # averave multiple channels for now
-        elseif in(chan, [:a, :b])
-            channum = findall(in([chan]), [:a, :b])
-            x = vec(x[:,channum])
-        elseif isa(chan, Integer)
+            x = vec(mean(x; dims=2))            # average multiple channels for now
+        elseif chan in (:a, :b)
+            channum = chan == :a ? 1 : 2
+            x = x[:,channum]
+        elseif chan isa Integer
             if !(chan in 1:nchan)
                 error("Bad channel specification: ", chan)
             end
-            x = vec(x[:,chan])
-            chan=[:a, :b][chan]
+            x = x[:,chan]
+            chan = (:a, :b)[chan]
         else
             error("Unknown channel specification: ", chan)
         end
@@ -42,17 +46,17 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
         nsamples, nchan = length(x), 1
     end
     ## save some metadata
-    meta = Dict("nsamples" => nsamples, "sr" => sr, "source" => source, "nchan" => nchan,
-            "chan" => chan)
+    meta = Dict("nsamples" => nsamples, "sr" => sr, "source" => source,
+                "nchan" => nchan, "chan" => chan)
     preemph = 0.97
     preemph ^= 16000. / sr
 
     ## basic features
-    (m, pspec, params) = mfcc(x, sr, defaults; preemph=preemph, mfccargs...)
+    m, pspec, params = mfcc(x, sr, defaults; preemph=preemph, mfccargs...)
     meta["totnframes"] = nrow(m)
 
     ## augment features
-    if augtype==:delta || augtype==:ddelta
+    if augtype in (:delta, :ddelta)
         d = deltas(m)
         if augtype==:ddelta
             dd = deltas(d)
@@ -67,14 +71,7 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
 
     if nrow(m)>0
         if sadtype==:energy
-            ## integrate power
-            deltaf = size(pspec,2) / (sr/2)
-            minfreqi = round(Int, 300deltaf)
-            maxfreqi = round(Int, 4000deltaf)
-            power = 10log10(sum(pspec[:,minfreqi:maxfreqi], 2))
-
-            maxpow = maximum(power)
-            speech = findall(power .> maxpow - dynrange)
+            speech = sad(pspec, sr; dynrange=dynrange)
             params["dynrange"] = dynrange
         elseif sadtype==:none
             speech = collect(1:nrow(m))
@@ -86,14 +83,14 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
     ## perform SAD
     m = m[speech,:]
     meta["speech"] = map(UInt32, speech)
-    meta["nframes"] , meta["nfea"] = size(m)
+    meta["nframes"], meta["nfea"] = size(m)
 
     ## normalization
-    if nrow(m)>0
-        if normtype==:warp
+    if !iszero(nrow(m))
+        if normtype == :warp
             m = warp(m, nwarp)
             params["warp"] = nwarp          # the default
-        elseif normtype==:mvn
+        elseif normtype == :mvn
             if nrow(m)>1
                 znorm!(m,1)
             else
@@ -102,60 +99,66 @@ function feacalc(x::Array; augtype=:ddelta, normtype=:warp, sadtype=:energy, dyn
         end
         meta["normtype"] = normtype
     end
-    return(map(Float32, m), meta, params)
+    return (map(Float32, m), meta, params)
 end
 
 ## When called with a specific application in mind, call with two arguments
 function feacalc(wavfile::AbstractString, application::Symbol; kwargs...)
-    if (application in [:speaker, :nbspeaker])
+    if application in (:speaker, :nbspeaker)
         feacalc(wavfile; defaults=:nbspeaker, kwargs...)
     elseif application==:wbspeaker
         feacalc(wavfile; defaults=:wbspeaker, kwargs...)
-    elseif (application==:language)
+    elseif application == :language
         feacalc(wavfile; defaults=:rasta, nwarp=299, augtype=:sdc, kwargs...)
-    elseif (application==:diarization)
+    elseif application == :diarization
         feacalc(wavfile; defaults=:rasta, sadtype=:none, normtype=:mvn, augtype=:none, kwargs...)
     else
         error("Unknown application ", application)
     end
 end
 
-function sad(pspec::Matrix{Float64}, sr::Float64, method=:energy; dynrange::Float64=30.)
-    deltaf = size(pspec,2) / (sr/2)
+function sad(pspec::AbstractMatrix{T}, sr::T, method=:energy; dynrange::T=30.) where T<:Float64
+    ## integrate power
+    deltaf = size(pspec, 2) / (sr/2)
     minfreqi = round(Int, 300deltaf)
     maxfreqi = round(Int, 4000deltaf)
-    power = 10log10(sum(pspec[:,minfreqi:maxfreqi], 2))
+    summed_pspec = vec(sum(view(pspec, :, minfreqi:maxfreqi); dims=2))
+    power = @. 10log10(summed_pspec)
     maxpow = maximum(power)
-    speech = findall(power .> maxpow - dynrange)
+    activity = power .> maxpow - dynrange
+    speech = findall(activity)
+    return speech
 end
 
 ## listen to SAD
 function sad(wavfile::AbstractString, speechout::AbstractString, silout::AbstractString; dynrange::Float64=30.)
-    (x, sr, nbits) = wavread(wavfile)
-    sr = float64(sr)               # more reasonable sr
-    x = vec(mean(x, dims=2))            # averave multiple channels for now
-    (m, pspec, meta) = mfcc(x, sr; preemph=0)
+    x, sr, nbits = wavread(wavfile)
+    sr = Float64(sr)                            # more reasonable sr
+    mx::Vector{Float64} = vec(mean(x; dims=2))  # average multiple channels for now
+    m, pspec, meta = mfcc(mx, sr; preemph=0)
     sp = sad(pspec, sr, dynrange=dynrange)
     sl = round(Int, meta["steptime"] * sr)
-    xi = falses(size(x))
-    for i in sp
-        xi[(i-1)*sl+(1:sl)] = true
+    xi = falses(axes(mx))
+    for i in @view sp[begin:end-1]
+        z = (i - 1) * sl
+        @. xi[z+1:z+sl] = true
     end
-    y = x[findall(xi)]
-    wavwrite(y, speechout, Fs=sr, nbits=nbits, compression=WAVE_FORMAT_PCM)
-    y = x[findall(.!xi)]
-    wavwrite(y, silout, Fs=sr, nbits=nbits, compression=WAVE_FORMAT_PCM)
+    z = (sp[end] - 1) * sl
+    xi[z+1:min(z+sl, lastindex(mx))] .= true
+    wavwrite(mx[xi], speechout, Fs=sr, nbits=nbits, compression=WAVE_FORMAT_PCM)
+    wavwrite(mx[.!xi], silout, Fs=sr, nbits=nbits, compression=WAVE_FORMAT_PCM)
 end
 
 ## this should probably be called soxread...
 function soxread(file)
-    nch = parse(Int, readall(`soxi -c $file`))
-    sr = parse(i=Int, readall(`soxi -r $file`))
+    nch = parse(Int, read(`soxi -c $file`, String))
+    sr = parse(Int, read(`soxi -r $file`, String))
     sox = `sox $file -t raw -e signed -r $sr -b 16 -`
-    fd, proc = open(sox, "r")
     x = Int16[]
-    while !eof(fd)
-        push!(x, read(fd, Int16))
+    open(sox, "r") do fd, proc
+        while !eof(fd)
+            push!(x, read(fd, Int16))
+        end
     end
     ns = length(x) ÷ nch
     reshape(x, nch, ns)' / (1<<15), sr
