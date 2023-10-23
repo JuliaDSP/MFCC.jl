@@ -17,16 +17,18 @@ function feacalc(wavfile::AbstractString; method=:wav, kwargs...)
         soxread(wavfile)
     elseif method == :sphere
         sphread(wavfile)
+    else
+        ArgumentError(string("Method not supported: ", method))
     end
     sr = Float64(sr)       # more reasonable sr
     feacalc(x; sr=sr, source=wavfile, kwargs...)
 end
 
 ## assume we have an array already
-function feacalc(x::AbstractArray; augtype=:ddelta, normtype=:warp, sadtype=:energy,
+function feacalc(x::AbstractVecOrMat; augtype=:ddelta, normtype=:warp, sadtype=:energy,
                  dynrange::Real=30., nwarp::Int=399, chan=:mono, sr::AbstractFloat=8000.0,
                  source=":array", defaults=:nbspeaker, mfccargs...)
-    if ndims(x) > 1
+    if x isa AbstractMatrix
         nsamples, nchan = size(x)
         if chan == :mono
             x = vec(mean(x; dims=2))            # average multiple channels for now
@@ -69,30 +71,28 @@ function feacalc(x::AbstractArray; augtype=:ddelta, normtype=:warp, sadtype=:ene
     end
     meta["augtype"] = augtype
 
-    if nrow(m)>0
+    if !isempty(m)
         if sadtype==:energy
             speech = sad(pspec, sr; dynrange=dynrange)
             params["dynrange"] = dynrange
+            ## perform SAD
+            m = m[speech,:]
+            meta["speech"] = map(UInt32, speech)
         elseif sadtype==:none
-            speech = collect(1:nrow(m))
+            nothing
         end
-    else
-        speech=Int[]
     end
     meta["sadtype"] = sadtype
-    ## perform SAD
-    m = m[speech,:]
-    meta["speech"] = map(UInt32, speech)
     meta["nframes"], meta["nfea"] = size(m)
 
     ## normalization
-    if !iszero(nrow(m))
+    if !isempty(m)
         if normtype == :warp
             m = warp(m, nwarp)
             params["warp"] = nwarp          # the default
         elseif normtype == :mvn
             if nrow(m)>1
-                znorm!(m,1)
+                znorm!(m, 1)
             else
                 fill!(m, 0)
             end

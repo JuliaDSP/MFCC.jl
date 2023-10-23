@@ -61,7 +61,7 @@ function mfcc(x::AbstractVector{<:AbstractFloat}, sr::AbstractFloat, defaults::S
     elseif defaults == :htk
         mfcc(x, sr; args...)
     else
-        ArgumentError(string("Unknown set of defaults ", defaults))
+        ArgumentError(string("Unknown set of defaults: ", defaults))
     end
 end
 

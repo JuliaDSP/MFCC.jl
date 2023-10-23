@@ -62,12 +62,12 @@ function fft2barkmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0., ma
     wts = zeros(nfilts, nfft)
     stepbark = nyqbark / (nfilts-1)
     binbarks = hz2bark.((0:hnfft) * sr / nfft)
-    for i in 1:nfilts
+    for i in axes(wts, 1), j in eachindex(binbarks)
         midbark = minbark + (i-1) * stepbark
-        lof = (binbarks .- midbark) / width .- 0.5
-        hif = (binbarks .- midbark) / width .+ 0.5
-        logwts = min.(0, hif, -2.5lof)
-        wts[i, 1:1+hnfft] = 10.0.^logwts
+        mf = (binbarks[j] - midbark) / width
+        lof, hif = mf - 0.5, mf + 0.5
+        logwt = min(0, hif, -2.5lof)
+        wts[i, j] = exp10(logwt)
     end
     return wts
 end
@@ -97,7 +97,7 @@ function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0,
     binfreqs = @. mel2hz(minmel + (0:(nfilts+1)) / (nfilts + 1) * (maxmel - minmel), htkmel);
 ##    binbin = iround(binfrqs/sr*(nfft-1));
 
-    for i in 1:nfilts
+    for i in axes(wts, 1)
         fs = binfreqs[i], binfreqs[i+1], binfreqs[i+2]
         # scale by width
         fs = @. fs[2] + (fs - fs[2])width
@@ -146,71 +146,80 @@ function mel2hz(z::AbstractFloat, htk::Bool=false)
     return f
 end
 
-function postaud(x::Matrix{T}, fmax::Real, fbtype=:bark, broaden=false) where {T<:AbstractFloat}
+"""
+Hynek's magic equal-loudness-curve formula
+"""
+function hynek_eql(bandcfhz)
+    fsq = bandcfhz^2
+    ftmp = fsq + 1.6e5
+    eql = ((fsq / ftmp)^2) * ((fsq + 1.44e6) / (fsq + 9.61e6))
+    eql
+end
+
+function postaud(x::AbstractMatrix{<:AbstractFloat}, fmax::Real, fbtype=:bark, broaden=false)
     nbands, nframes = size(x)
     nfpts = nbands + 2broaden
     if fbtype == :bark
-        bandcfhz = bark2hz(range(0, stop=hz2bark(fmax), length=nfpts))
+        bandcfhz = bark2hz.(range(0, stop=hz2bark(fmax), length=nfpts))
     elseif fbtype == :mel
         bandcfhz = mel2hz.(range(0, stop=hz2mel(fmax), length=nfpts))
     elseif fbtype == :htkmel || fbtype == :fcmel
         bandcfhz = mel2hz.(range(0, stop=hz2mel(fmax, true), length=nfpts),1);
     else
-        ArgumentError(string("Unknown filterbank type ", fbtype))
+        ArgumentError(string("Unknown filterbank type: ", fbtype))
     end
     # Remove extremal bands (the ones that will be duplicated)
-    bandcfhz = bandcfhz[1+broaden:nfpts-broaden];
-    # Hynek's magic equal-loudness-curve formula
-    fsq = bandcfhz.^2
-    ftmp = fsq + 1.6e5
-    eql = @. ((fsq / ftmp)^2) * ((fsq + 1.44e6) / (fsq + 9.61e6))
+    keepat!(bandcfhz, 1+broaden:nfpts-broaden)
+
+    eql = hynek_eql.(bandcfhz)
     # weight the critical bands
-    z = eql .* x
+    z = @. cbrt(eql * x)
     # cube root compress
-    @. z = cbrt(z)
+
     # replicate first and last band (because they are unreliable as calculated)
     if broaden
-        z = z[[1, 1:nbands, nbands], :];
+        z = z[[1; 1:nbands; nbands], :];
     else
-        z = z[[2, 2:(nbands-1), nbands-1], :]
+        z = z[[2; 2:(nbands-1); nbands-1], :]
     end
     return z
 end
 
-function dolpc(x::Array{T}, modelorder::Int=8) where {T<:AbstractFloat}
+function dolpc(x::AbstractMatrix{<:AbstractFloat}, modelorder::Int=8)
     nbands, nframes = size(x)
-    r = real(ifft(vcat(x, x[collect(nbands-1:-1:2), :]), 1)[1:nbands, :])
+    r = real(ifft(x[[1:nbands; nbands-1:-1:2], :], 1)[1:nbands, :])
     # Find LPC coeffs by durbin
     y, e = levinson(r, modelorder)
     # Normalize each poly by gain
     y ./= e
 end
 
-function lpc2cep(a::Array{T}, ncep::Int=0) where {T<:AbstractFloat}
+function lpc2cep(a::AbstractMatrix{T}, ncep::Int=0) where {T<:AbstractFloat}
     nlpc, nc = size(a)
     order = nlpc - 1
-    if ncep == 0
+    if iszero(ncep)
         ncep = nlpc
     end
     c = zeros(ncep, nc)
     # Code copied from HSigP.c: LPC2Cepstrum
     # First cep is log(Error) from Durbin
-    c[1,:] = -log.(a[1, :])
+    @. c[begin, :] = -log(a[begin, :])
     # Renormalize lpc A coeffs
-    a ./= a[1, :]
+    @. a /= a[begin, :]
+    sum_var = Vector{T}(undef, nc)
     for n in 2:ncep
-        sum = zero(T)
+        fill!(sum_var, 0)
         for m in 2:n
-            sum += (n - m) * a[m, :] .* c[n - m + 1, :]
+            @. sum_var += (n - m) * a[m, :] * c[n - m + 1, :]
         end
-        c[n, :] = -a[n, :] - sum / (n - 1)
+        @. c[n, :] = -a[n, :] - sum / (n - 1)
     end
     return c
 end
 
 function spec2cep(spec::AbstractMatrix{<:AbstractFloat}, ncep::Int=13, dcttype::Int=2)
     # no discrete cosine transform option
-    dcttype == -1 && return log.(spec)
+    dcttype == -1 && return map!(log, spec, spec)
 
     nr, nc = size(spec)
     dctm = similar(spec, ncep, nr)
@@ -230,11 +239,13 @@ function spec2cep(spec::AbstractMatrix{<:AbstractFloat}, ncep::Int=13, dcttype::
         end
         @. dctm[:, 1] += 1
         @. dctm /= 2(nr + 1)
-    else                        # type 1
+    elseif dcttype == 1         # type 1
         for j in 1:nr, i in 1:ncep
             dctm[i, j] = cospi((i-1) * (j-1) / (nr - 1)) / (nr - 1)
         end
         @. dctm[:, [1, nr]] /= 2
+    else
+        DomainError(dcttype, "DCT type must be an integer from 1 to 4")
     end
     # assume spec is not reused
     return dctm * map!(log, spec, spec)
