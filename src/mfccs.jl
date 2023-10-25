@@ -144,30 +144,28 @@ function znorm!(x::AbstractArray, dim::Int=1)
 end
 
 ## short-term mean and variance normalization
-function stmvn(x::AbstractVector, w::Int=399)
-    y = similar(x)
-    hw = w ÷ 2 ## effectively makes `w` odd...
+function stmvn(x::AbstractVector{T}, w::Int=399) where T
+    y = similar(x, promote_type(Float64, T))
     nx = length(x)
-    nx ≤ 1 && return x
+    nx ≤ 1 || w <= 1 && return copy!(y, x)
+    hw = w ÷ 2 ## effectively makes `w` odd...
+    len_w = min(nx, hw + 1)
+    v = Iterators.take(x, len_w)
     ## initialize sum x and sum x^2
-    sx = (hw + 1) * x[1]
-    sxx = (hw + 1) * x[1] * x[1]
-    for i in 2:min(nx, hw + 1)
-        sx += x[i]
-        sxx += x[i] * x[i]
-    end
+    sx = sum(v) + hw * first(x)
+    sxx = sum(x -> x^2, v) + hw * first(x)^2
     if hw + 1 > nx
-        sx += (hw + 1 - nx) * x[nx]
-        sxx += (hw + 1 - nx) * x[nx] * x[nx]
+        sx += (hw + 1 - nx) * last(x)
+        sxx += (hw + 1 - nx) * last(x)^2
     end
-    for i in 1:nx
+    for i in eachindex(x, y)
         μ = sx / w
         σ = sqrt((sxx - μ * sx) / (w - 1))
         y[i] = (x[i] - μ) / σ
-        mi = max(i - hw, 1)
-        ma = min(i + hw + 1, nx)
+        mi = max(i - hw, firstindex(x))
+        ma = min(i + hw + 1, lastindex(x))
         sx += x[ma] - x[mi]
-        sxx += x[ma] * x[ma] - x[mi] * x[mi]
+        sxx += x[ma]^2 - x[mi]^2
     end
     return y
 end

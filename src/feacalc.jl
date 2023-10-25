@@ -72,13 +72,13 @@ function feacalc(x::AbstractVecOrMat; augtype=:ddelta, normtype=:warp, sadtype=:
     meta["augtype"] = augtype
 
     if !isempty(m)
-        if sadtype==:energy
+        if sadtype == :energy
             speech = sad(pspec, sr; dynrange=dynrange)
             params["dynrange"] = dynrange
             ## perform SAD
             m = m[speech,:]
             meta["speech"] = map(UInt32, speech)
-        elseif sadtype==:none
+        elseif sadtype == :none
             nothing
         end
     end
@@ -117,7 +117,7 @@ function feacalc(wavfile::AbstractString, application::Symbol; kwargs...)
     end
 end
 
-function sad(pspec::AbstractMatrix{T}, sr::T, method=:energy; dynrange::T=30.) where T<:Float64
+function sad(pspec::AbstractMatrix, sr::T, method=:energy; dynrange::T=30.) where T<:Float64
     ## integrate power
     deltaf = size(pspec, 2) / (sr/2)
     minfreqi = round(Int, 300deltaf)
