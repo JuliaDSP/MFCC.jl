@@ -8,9 +8,7 @@
 import HDF5
 
 ## encode non-HDF5 types in the key by adding type indicator---a poorman's solution
-HDF5.write(fd::HDF5.File, s::AbstractString, b::Bool) = write(fd, string(s,":Bool"), Int8(b))
 HDF5.write(fd::HDF5.File, s::AbstractString, sym::Symbol) = write(fd, string(s,":Symbol"), string(sym))
-HDF5.write(fd::HDF5.File, s::AbstractString, ss::SubString) = write(fd, s, ascii(ss))
 
 ## always save data in Float32
 ## the functiona arguments are the same as the output of feacalc
@@ -37,15 +35,13 @@ end
 ## FileIO.save(file::AbstractString, x::Matrix)
 
 ## the reverse encoding of Julia types.
-function retype(d::Dict)
-    r = Dict()
+function retype(d::Dict{<:AbstractString, T} where T)
+    r = Dict{Symbol, Any}()
     for (k, v) in d
-        if (m=match(r"^(.*):Bool$", k)) !== nothing
-            r[m.captures[1]] = v > 0
-        elseif (m=match(r"(.*):Symbol", k)) !== nothing
-            r[m.captures[1]] = Symbol(v)
+        if (m=match(r"(.*):Symbol", k)) !== nothing
+            r[Symbol(m.captures[1])] = Symbol(v)
         else
-            r[k] = v
+            r[Symbol(k)] = v
         end
     end
     r
@@ -57,8 +53,8 @@ function h5check(obj, name, content)
     obj[content]
 end
 
-## Currently we always read the data in float64
-function feaload(file::AbstractString; meta=false, params=false)
+## Currently we always read the data in Float64
+function feaload(file::AbstractString; meta::Bool=false, params::Bool=false)
     HDF5.h5open(file, "r") do fd
         f = h5check(fd, file, "features")
         fea = map(Float64, read(h5check(f, "features", "data")))
@@ -76,7 +72,7 @@ function feaload(file::AbstractString; meta=false, params=false)
         if params
             push!(res, retype(read(h5check(f, "features", "params"))))
         end
-        tuple(res...)
+        Tuple(res)
     end
 end
 

@@ -37,11 +37,11 @@ function mfcc(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numc
         cepstra = spec2cep(aspec, numcep, dcttype)
     end
     cepstra = Array(lifter(cepstra, lifterexp)')
-    meta = Dict("sr" => sr, "wintime" => wintime, "steptime" => steptime, "numcep" => numcep,
-            "lifterexp" => lifterexp, "sumpower" => sumpower, "preemph" => preemph,
-            "dither" => dither, "minfreq" => minfreq, "maxfreq" => maxfreq, "nbands" => nbands,
-            "bwidth" => bwidth, "dcttype" => dcttype, "fbtype" => fbtype,
-            "usecmp" => usecmp, "modelorder" => modelorder)
+    meta = Dict(:sr => sr, :wintime => wintime, :steptime => steptime, :numcep => numcep,
+            :lifterexp => lifterexp, :sumpower => sumpower, :preemph => preemph,
+            :dither => dither, :minfreq => minfreq, :maxfreq => maxfreq, :nbands => nbands,
+            :bwidth => bwidth, :dcttype => dcttype, :fbtype => fbtype,
+            :usecmp => usecmp, :modelorder => modelorder)
     return (cepstra, pspec', meta)
 end
 
@@ -50,7 +50,7 @@ mfcc(x::AbstractMatrix{<:AbstractFloat}, sr::Real=16000.0; args...) = @distribut
 
 
 ## default feature configurations, :rasta, :htk, :spkid_toolkit, :wbspeaker
-## With optional extra agrs... you can specify more options
+## With optional extra args... you can specify more options
 function mfcc(x::AbstractVector{<:AbstractFloat}, sr::AbstractFloat, defaults::Symbol; args...)
     if defaults == :rasta
         mfcc(x, sr; lifterexp=0.6, sumpower=true, nbands=40, dcttype=2, fbtype=:mel, args...)
@@ -74,8 +74,8 @@ function deltas(x::AbstractMatrix{T}, w::Int=9) where {T<:AbstractFloat}
     hlen = w ÷ 2
     w = 2hlen + 1                 # make w odd
     win = collect(convert(T, hlen):-1:-hlen)
-    x1 = x[1:1, :]
-    xend = x[end:end,:]
+    x1 = x[begin:begin, :]
+    xend = x[end:end, :]
     xx = vcat(repeat(x1, hlen), x, repeat(xend, hlen)) ## take care of boundaries
     norm = 3 / (hlen * w * (hlen + 1))
     delta_v = filt(PolynomialRatio(win, [1.]), xx)[2hlen .+ (1:nr), :]
@@ -176,9 +176,9 @@ stmvn(m::AbstractMatrix, w::Int=399, dim::Int=1) = mapslices(x->stmvn(x, w), m; 
 function sdc(x::AbstractMatrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7) where {T<:AbstractFloat}
     nx, nfea = size(x)
     n ≤ nfea || DomainError(n, "Not enough features for n")
-    hnfill = (k-1) * p / 2
+    hnfill = (k - 1) * p / 2
     nfill1, nfill2 = floor(Int, hnfill), ceil(Int, hnfill)
-    xx = vcat(zeros(T, nfill1, n), deltas(x[:,1:n], 2d+1), zeros(T, nfill2, n))
+    xx = vcat(zeros(T, nfill1, n), deltas(x[:, 1:n], 2d+1), zeros(T, nfill2, n))
     y = zeros(T, nx, n*k)
     for (dt, offset) in zip(0:p:p*k-1, 0:n:n*k-1)
         y[:, offset.+(1:n)] = xx[dt.+(1:nx), :]

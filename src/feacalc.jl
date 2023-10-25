@@ -33,13 +33,13 @@ function feacalc(x::AbstractVecOrMat; augtype=:ddelta, normtype=:warp, sadtype=:
         if chan == :mono
             x = vec(mean(x; dims=2))            # average multiple channels for now
         elseif chan in (:a, :b)
-            channum = chan == :a ? 1 : 2
-            x = x[:,channum]
+            channum = chan == :b
+            x = x[:, begin+channum]
         elseif chan isa Integer
             if !(chan in 1:nchan)
                 DomainError(chan, "Bad channel specification")
             end
-            x = x[:,chan]
+            x = x[:, begin+chan-1]
             chan = (:a, :b)[chan]
         else
             ArgumentError(string("Unknown channel specification: ", chan))
@@ -48,48 +48,48 @@ function feacalc(x::AbstractVecOrMat; augtype=:ddelta, normtype=:warp, sadtype=:
         nsamples, nchan = length(x), 1
     end
     ## save some metadata
-    meta = Dict("nsamples" => nsamples, "sr" => sr, "source" => source,
-                "nchan" => nchan, "chan" => chan)
+    meta = Dict(:nsamples => nsamples, :sr => sr, :source => source,
+                :nchan => nchan, :chan => chan)
     preemph = 0.97
     preemph ^= 16000. / sr
 
     ## basic features
     m, pspec, params = mfcc(x, sr, defaults; preemph=preemph, mfccargs...)
-    meta["totnframes"] = nrow(m)
+    meta[:totnframes] = nrow(m)
 
     ## augment features
     if augtype in (:delta, :ddelta)
         d = deltas(m)
-        if augtype==:ddelta
+        if augtype == :ddelta
             dd = deltas(d)
             m = hcat(m, d, dd)
         else
             m = hcat(m, d)
         end
-    elseif augtype==:sdc
+    elseif augtype == :sdc
         m = sdc(m)
     end
-    meta["augtype"] = augtype
+    meta[:augtype] = augtype
 
     if !isempty(m)
         if sadtype == :energy
             speech = sad(pspec, sr; dynrange=dynrange)
-            params["dynrange"] = dynrange
+            params[:dynrange] = dynrange
             ## perform SAD
             m = m[speech,:]
-            meta["speech"] = map(UInt32, speech)
+            meta[:speech] = map(UInt32, speech)
         elseif sadtype == :none
             nothing
         end
     end
-    meta["sadtype"] = sadtype
-    meta["nframes"], meta["nfea"] = size(m)
+    meta[:sadtype] = sadtype
+    meta[:nframes], meta[:nfea] = size(m)
 
     ## normalization
     if !isempty(m)
         if normtype == :warp
             m = warp(m, nwarp)
-            params["warp"] = nwarp          # the default
+            params[:warp] = nwarp          # the default
         elseif normtype == :mvn
             if nrow(m)>1
                 znorm!(m, 1)
@@ -97,7 +97,7 @@ function feacalc(x::AbstractVecOrMat; augtype=:ddelta, normtype=:warp, sadtype=:
                 fill!(m, 0)
             end
         end
-        meta["normtype"] = normtype
+        meta[:normtype] = normtype
     end
     return (map(Float32, m), meta, params)
 end
@@ -136,7 +136,7 @@ function sad(wavfile::AbstractString, speechout::AbstractString, silout::Abstrac
     mx::Vector{Float64} = vec(mean(x; dims=2))  # average multiple channels for now
     m, pspec, meta = mfcc(mx, sr; preemph=0)
     sp = sad(pspec, sr; dynrange=dynrange)
-    sl = round(Int, meta["steptime"] * sr)
+    sl = round(Int, meta[:steptime] * sr)
     xi = falses(axes(mx))
     for i in @view sp[begin:end-1]
         z = (i - 1) * sl
