@@ -47,11 +47,11 @@ function audspec(x::AbstractMatrix{<:AbstractFloat}, sr::Real=16000.0;
     else
         ArgumentError(string("Unknown filterbank type ", fbtype))
     end
-    wts = wts[:, 1:nfreqs]
+    wts_v = view(wts, :, 1:nfreqs)
     if sumpower
-        return wts * x
+        return wts_v * x
     else
-        return (wts * sqrt.(x)).^2
+        return (wts_v * sqrt.(x)).^2
     end
 end
 
@@ -171,23 +171,23 @@ function postaud(x::AbstractMatrix{<:AbstractFloat}, fmax::Real, fbtype=:bark, b
     # Remove extremal bands (the ones that will be duplicated)
     keepat!(bandcfhz, 1+broaden:nfpts-broaden)
 
-    eql = hynek_eql.(bandcfhz)
     # weight the critical bands
-    z = @. cbrt(eql * x)
+    eql = hynek_eql.(bandcfhz)
     # cube root compress
+    z = @. cbrt(eql * x)
 
     # replicate first and last band (because they are unreliable as calculated)
     if broaden
-        z = z[[1; 1:nbands; nbands], :];
+        z = z[[begin; begin:end; end], :];
     else
-        z = z[[2; 2:(nbands-1); nbands-1], :]
+        z = z[[begin+1; begin+1:end-1; end-1], :]
     end
     return z
 end
 
 function dolpc(x::AbstractMatrix{<:AbstractFloat}, modelorder::Int=8)
     nbands, nframes = size(x)
-    r = real(ifft(x[[1:nbands; nbands-1:-1:2], :], 1)[1:nbands, :])
+    r = real(ifft(x[[begin:end; end-1:-1:2], :], 1)[begin:begin+nbands-1, :])
     # Find LPC coeffs by durbin
     y, e = levinson(r, modelorder)
     # Normalize each poly by gain
@@ -280,7 +280,7 @@ end
 ## "You are welcome to move my octave code from GPL to MIT like core Julia."
 ## untested
 ## only returns a, v
-function levinson(acf::Vector{T}, p::Int) where {T<:Real}
+function levinson(acf::AbstractVector{<:Number}, p::Int)
     if isempty(acf)
         ArgumentError("Empty autocorrelation function")
     end
@@ -290,58 +290,59 @@ function levinson(acf::Vector{T}, p::Int) where {T<:Real}
     if p < 100
         ## direct solution [O(p^3), but no loops so slightly faster for small p]
         ## Kay & Marple Eqn (2.39)
-        R = toeplitz(acf[1:p], conj(acf[1:p]))
-        a = R \ -acf[2:p+1]
+        R = toeplitz(@view acf[begin:begin+p-1])
+        a = R \ @view acf[begin+1:begin+p]
+        @. a = -a
         pushfirst!(a, 1)
-        v = real(a.*conj(acf[1:p+1]))
+        v = @. real(a*conj(@view acf[begin:begin+p]))
     else
         ## durbin-levinson [O(p^2), so significantly faster for large p]
         ## Kay & Marple Eqns (2.42-2.46)
-        ref = zeros(p)
-        g = -acf[2] / acf[1]
-        a = [g]
-        v = real((1 - abs2(g)) * acf[1])
-        ref[1] = g
-        for t=2:p
-            g = -(acf[t+1] + a ⋅ acf[t:-1:2]) / v
-            a = [a + g * conj(a[t-1:-1:1]), g]
+        # ref = zeros(p)
+        g = -acf[begin+1] / acf[begin]
+        a = [1, g]; sizehint!(a, p+1)
+        v = real((1 - abs2(g)) * acf[begin])
+        # ref[begin] = g  # is not used???
+        for t in 2:p
+            g = -(acf[begin+t] + @views a[2:end] ⋅ acf[begin+t-1:-1:begin+1]) / v
+            for i in 2:t
+                a[i] = a[i] + g * conj(a[end-i+2])
+            end
+            push!(a, g)
             v *= 1 - abs2(g)
-            ref[t] = g
+            # ref[t] = g
         end
-        pushfirst!(a, 1)
     end
     return a, v
 end
 
-function levinson(acf::Array{T}, p::Int) where {T<:Real}
+function levinson(acf::AbstractMatrix{<:Number}, p::Integer)
     nr, nc = size(acf)
     a = zeros(p + 1, nc)
     v = zeros(p + 1, nc)
-    for i in 1:nc
-        a[:,i], v[:,i] = levinson(acf[:,i], p)
+    for i in axes(acf, 2)
+        a[:, i], v[:, i] = levinson(view(acf, :, i), p)
     end
     return a, v
 end
 
 ## Freely after octave's implementation, ver 3.2.4, by jwe && jh
+## toeplitz(c) is Hermitian with column c
 ## skipped sparse implementation
-function toeplitz(c::Vector{T}, r::Vector{T}=c) where {T<:Real}
-    nc = length(r)
-    nr = length(c)
-    res = zeros(T, nr, nc)
+function toeplitz(c::AbstractVector{T}, r::AbstractVector{V}=conj(c)) where {T, V <: Number}
+    nc = length(c)
+    nr = length(r)
+    res = Matrix{promote_type(T, V)}(undef, nc, nr)
     if iszero(nc) || iszero(nr)
         return res
     end
-    if r[1] != c[1]
-        ## warn
-    end
-    if typeof(c) <: Complex
-        conj!(c)
+    if first(r) != first(c)
+        @warn "First elements of a Toeplitz matrix should be equal."
     end
     ## if issparse(c) && ispsparse(r)
-    data = [r[end:-1:2], c]
-    for (i, start) in zip(1:nc, nc:-1:1)
-        res[:,i] = data[start:start+nr-1]
+    data = [r[end:-1:begin+1]; c]
+    for j in axes(res, 2), i in axes(res, 1)
+        res[i, j] = data[nr-j+i]
     end
     return res
 end
