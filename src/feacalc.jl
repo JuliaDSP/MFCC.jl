@@ -91,7 +91,7 @@ function feacalc(x::AbstractVecOrMat; augtype=:ddelta, normtype=:warp, sadtype=:
             m = warp(m, nwarp)
             params[:warp] = nwarp          # the default
         elseif normtype == :mvn
-            if nrow(m)>1
+            if nrow(m) > 1
                 znorm!(m, 1)
             else
                 fill!(m, 0)

@@ -22,7 +22,7 @@ function powspec(x::AbstractVector{<:AbstractFloat}, sr::Real=8000.0; wintime=0.
 
     y = spectrogram(x .* (1<<15), nwin, noverlap, nfft=nfft, fs=sr, window=window, onesided=true).power
     ## for compability with previous specgram method, remove the last frequency and scale
-    y = y[1:end-1, :] ##  * sumabs2(window) * sr / 2
+    y = y[begin:end-1, :]   ##  * sumabs2(window) * sr / 2
     y .+= dither * nwin / (sum(abs2, window) * sr / 2) ## OK with julia 0.5, 0.6 interpretation as broadcast!
 
     return y

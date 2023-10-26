@@ -11,7 +11,7 @@ using DSP
 ## i.e., multichannel data
 ## Recoded from rastamat's "melfcc.m" (c) Dan Ellis.
 ## Defaults here are HTK parameters, this is contrary to melfcc
-function mfcc(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numcep=13,
+function mfcc(x::AbstractVector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numcep=13,
               lifterexp=-22, preemph=0.97, minfreq=0.0, maxfreq=sr/2, nbands=20,
               bwidth=1.0, dcttype=3, fbtype=:htkmel, modelorder=0, sumpower::Bool=false,
               dither::Bool=false, usecmp::Bool=false) where {T<:AbstractFloat}
@@ -45,7 +45,6 @@ function mfcc(x::Vector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numc
     return (cepstra, pspec', meta)
 end
 
-mfcc(x::AbstractVector{<:AbstractFloat}, sr::Real=16000.0; args...) = mfcc(Vector(x), sr; args...)
 mfcc(x::AbstractMatrix{<:AbstractFloat}, sr::Real=16000.0; args...) = @distributed (tuple) for i in axes(x, 2) mfcc(x[:, i], sr; args...) end
 
 
@@ -78,7 +77,7 @@ function deltas(x::AbstractMatrix{T}, w::Int=9) where {T<:AbstractFloat}
     xend = x[end:end, :]
     xx = vcat(repeat(x1, hlen), x, repeat(xend, hlen)) ## take care of boundaries
     norm = 3 / (hlen * w * (hlen + 1))
-    delta_v = filt(PolynomialRatio(win, [1.]), xx)[2hlen .+ (1:nr), :]
+    delta_v = filt(PolynomialRatio(win, [1.]), xx)[begin+2hlen:end, :]
     @. delta_v *= norm
     return delta_v
 end
@@ -178,10 +177,14 @@ function sdc(x::AbstractMatrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7) where
     n ≤ nfea || DomainError(n, "Not enough features for n")
     hnfill = (k - 1) * p / 2
     nfill1, nfill2 = floor(Int, hnfill), ceil(Int, hnfill)
-    xx = vcat(zeros(T, nfill1, n), deltas(x[:, 1:n], 2d+1), zeros(T, nfill2, n))
+    xx = vcat(zeros(T, nfill1, n), deltas(@view(x[:, begin:begin+n-1]), 2d+1), zeros(T, nfill2, n))
     y = zeros(T, nx, n*k)
-    for (dt, offset) in zip(0:p:p*k-1, 0:n:n*k-1)
-        y[:, offset.+(1:n)] = xx[dt.+(1:nx), :]
+    for i in 0:k-1
+        dt = i * p
+        offset = i * n
+        for j in axes(xx, 2), r in axes(y, 1)
+            y[r, offset+j] = xx[dt+r, j]
+        end
     end
     return y
 end
