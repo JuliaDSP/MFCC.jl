@@ -187,7 +187,7 @@ end
 
 function dolpc(x::AbstractMatrix{<:AbstractFloat}, modelorder::Int=8)
     nbands, nframes = size(x)
-    r = real(ifft(x[[begin:end; end-1:-1:2], :], 1)[begin:begin+nbands-1, :])
+    r = real(ifft(x[[begin:end; end-1:-1:begin+1], :], 1)[begin:begin+nbands-1, :])
     # Find LPC coeffs by durbin
     y, e = levinson(r, modelorder)
     # Normalize each poly by gain
@@ -200,20 +200,22 @@ function lpc2cep(a::AbstractMatrix{T}, ncep::Int=0) where {T<:AbstractFloat}
     if iszero(ncep)
         ncep = nlpc
     end
-    c = zeros(ncep, nc)
+    c = zeros(nc, ncep)
+    a = Matrix(a')
     # Code copied from HSigP.c: LPC2Cepstrum
     # First cep is log(Error) from Durbin
-    @. c[begin, :] = -log(a[begin, :])
+    @views @. c[:, begin] = -log(a[:, begin])
     # Renormalize lpc A coeffs
-    @. a /= a[begin:begin, :]
-    for j in axes(c, 2), i in 2:ncep
-        sum_var = zero(T)
+    @. a /= a[:, begin]
+    sum_var = Vector{T}(undef, nc)
+    @views for i in 2:ncep
+        fill!(sum_var, zero(T))
         for m in 2:i
-            sum_var += (i - m) * a[m, j] * c[i - m + 1, j]
+            @. sum_var += (i - m) * a[:, m] * c[:, i - m + 1]
         end
-        c[i, j] = -a[i, j] - sum_var / (i - 1)
+        @. c[:, i] = -a[:, i] - sum_var / (i - 1)
     end
-    return c
+    return c'
 end
 
 function spec2cep(spec::AbstractMatrix{<:AbstractFloat}, ncep::Int=13, dcttype::Int=2)
