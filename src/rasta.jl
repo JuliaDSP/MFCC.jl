@@ -205,7 +205,7 @@ function lpc2cep(a::AbstractMatrix{T}, ncep::Int=0) where {T<:AbstractFloat}
     # First cep is log(Error) from Durbin
     @. c[begin, :] = -log(a[begin, :])
     # Renormalize lpc A coeffs
-    @. a /= a[begin, :]
+    @. a /= a[begin:begin, :]
     for j in axes(c, 2), i in 2:ncep
         sum_var = zero(T)
         for m in 2:i
