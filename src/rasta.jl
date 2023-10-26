@@ -109,9 +109,9 @@ function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0,
     if !constamp
         ## unclear what this does...
         ## Slaney-style mel is scaled to be approx constant E per channel
-        @. wts = 2 / ((binfreqs[3:nfilts+2]) - binfreqs[1:nfilts]) * wts
+        @. wts = 2 / ((binfreqs[3:end]) - binfreqs[1:nfilts]) * wts
         # Make sure 2nd half of DFT is zero
-        wts[:, lastind+1:nfft] .= 0.
+        wts[:, lastind+1:end] .= 0.
     end
     return wts
 end
@@ -163,7 +163,7 @@ function postaud(x::AbstractMatrix{<:AbstractFloat}, fmax::Real, fbtype=:bark, b
         bandcfhz = bark2hz.(range(0, stop=hz2bark(fmax), length=nfpts))
     elseif fbtype == :mel
         bandcfhz = mel2hz.(range(0, stop=hz2mel(fmax), length=nfpts))
-    elseif fbtype == :htkmel || fbtype == :fcmel
+    elseif fbtype in (:htkmel, :fcmel)
         bandcfhz = mel2hz.(range(0, stop=hz2mel(fmax, true), length=nfpts),1);
     else
         ArgumentError(string("Unknown filterbank type: ", fbtype))
@@ -206,13 +206,12 @@ function lpc2cep(a::AbstractMatrix{T}, ncep::Int=0) where {T<:AbstractFloat}
     @. c[begin, :] = -log(a[begin, :])
     # Renormalize lpc A coeffs
     @. a /= a[begin, :]
-    sum_var = Vector{T}(undef, nc)
-    for n in 2:ncep
-        fill!(sum_var, 0)
-        for m in 2:n
-            @. sum_var += (n - m) * a[m, :] * c[n - m + 1, :]
+    for j in axes(c, 2), i in 2:ncep
+        sum_var = zero(T)
+        for m in 2:i
+            sum_var += (i - m) * a[m, j] * c[i - m + 1, j]
         end
-        @. c[n, :] = -a[n, :] - sum / (n - 1)
+        c[i, j] = -a[i, j] - sum_var / (i - 1)
     end
     return c
 end
