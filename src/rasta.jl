@@ -12,7 +12,8 @@ using DSP
 using FFTW
 using LinearAlgebra
 
-function powspec(x::AbstractVector{<:AbstractFloat}, sr::Real=8000.0; wintime=0.025, steptime=0.01, dither=true)
+function powspec(x::AbstractVector{<:AbstractFloat}, sr::Real=8000.0;
+                 wintime::Real=0.025, steptime::Real=0.01, dither::Real=true)
     nwin = round(Integer, wintime * sr)
     nstep = round(Integer, steptime * sr)
 
@@ -55,7 +56,7 @@ function audspec(x::AbstractMatrix{<:AbstractFloat}, sr::Real=16000.0;
     end
 end
 
-function fft2barkmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0., maxfreq=sr/2)
+function fft2barkmx(nfft::Integer, nfilts::Integer; sr=8000.0, width=1.0, minfreq=0., maxfreq=sr/2)
     hnfft = nfft >> 1
     minbark = hz2bark(minfreq)
     nyqbark = hz2bark(maxfreq) - minbark
@@ -85,7 +86,7 @@ function slope_gen(fs, fftfreq)
     max(0, min(loslope, hislope))
 end
 
-function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0,
+function fft2melmx(nfft::Integer, nfilts::Integer; sr=8000.0, width=1.0, minfreq=0.0,
                    maxfreq=sr/2, htkmel::Bool=false, constamp::Bool=false)
     wts = zeros(nfilts, nfft)
     lastind = (nfft>>1)
@@ -111,7 +112,7 @@ function fft2melmx(nfft::Int, nfilts::Int; sr=8000.0, width=1.0, minfreq=0.0,
         ## Slaney-style mel is scaled to be approx constant E per channel
         @. wts = 2 / ((binfreqs[3:end]) - binfreqs[1:nfilts]) * wts
         # Make sure 2nd half of DFT is zero
-        wts[:, lastind+1:end] .= 0.
+        wts[:, begin+lastind:end] .= 0.
     end
     return wts
 end
@@ -164,7 +165,7 @@ function postaud(x::AbstractMatrix{<:AbstractFloat}, fmax::Real, fbtype=:bark, b
     elseif fbtype == :mel
         bandcfhz = mel2hz.(range(0, stop=hz2mel(fmax), length=nfpts))
     elseif fbtype in (:htkmel, :fcmel)
-        bandcfhz = mel2hz.(range(0, stop=hz2mel(fmax, true), length=nfpts),1);
+        bandcfhz = mel2hz.(range(0, stop=hz2mel(fmax, true), length=nfpts), true);
     else
         ArgumentError(string("Unknown filterbank type: ", fbtype))
     end
@@ -201,7 +202,7 @@ function lpc2cep(a::AbstractMatrix{T}, ncep::Int=0) where {T<:AbstractFloat}
         ncep = nlpc
     end
     c = zeros(nc, ncep)
-    a = Matrix(a')
+    a = copy(a')
     # Code copied from HSigP.c: LPC2Cepstrum
     # First cep is log(Error) from Durbin
     @views @. c[:, begin] = -log(a[:, begin])
@@ -252,7 +253,7 @@ function spec2cep(spec::AbstractMatrix{<:AbstractFloat}, ncep::Int=13, dcttype::
     return dctm * map!(log, spec, spec)
 end
 
-function lifter(x::AbstractArray{<:AbstractFloat}, lift::Real=0.6, invs=false)
+function lifter(x::AbstractArray{<:AbstractFloat}, lift::Real=0.6, invs::Bool=false)
     ncep, nf = size(x)
     if iszero(lift)
         return x
@@ -272,7 +273,7 @@ function lifter(x::AbstractArray{<:AbstractFloat}, lift::Real=0.6, invs=false)
     if invs
         @. liftw = inv(liftw)
     end
-    y = broadcast(*, x, liftw)
+    y = broadcast(*, x', liftw')
     return y
 end
 

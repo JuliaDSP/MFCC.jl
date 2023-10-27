@@ -36,12 +36,12 @@ function mfcc(x::AbstractVector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.
     else
         cepstra = spec2cep(aspec, numcep, dcttype)
     end
-    cepstra = Array(lifter(cepstra, lifterexp)')
+    cepstra = lifter(cepstra, lifterexp)
     meta = Dict(:sr => sr, :wintime => wintime, :steptime => steptime, :numcep => numcep,
-            :lifterexp => lifterexp, :sumpower => sumpower, :preemph => preemph,
-            :dither => dither, :minfreq => minfreq, :maxfreq => maxfreq, :nbands => nbands,
-            :bwidth => bwidth, :dcttype => dcttype, :fbtype => fbtype,
-            :usecmp => usecmp, :modelorder => modelorder)
+                :lifterexp => lifterexp, :sumpower => sumpower, :preemph => preemph,
+                :dither => dither, :minfreq => minfreq, :maxfreq => maxfreq, :nbands => nbands,
+                :bwidth => bwidth, :dcttype => dcttype, :fbtype => fbtype,
+                :usecmp => usecmp, :modelorder => modelorder)
     return (cepstra, pspec', meta)
 end
 
