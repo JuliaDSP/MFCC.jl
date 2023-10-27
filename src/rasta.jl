@@ -133,15 +133,15 @@ end
 
 function mel2hz(z::AbstractFloat, htk::Bool=false)
     if htk
-        f = 700 * (10 ^ (z / 2595) - 1)
+        f = 700 * (exp10(z / 2595) - 1)
     else
         f0 = 0.0
         fsp = 200 / 3
         brkfrq = 1000.0
         brkpt = (brkfrq - f0) / fsp
-        logstep = exp(log(6.4) / 27)
+        logstep = log(6.4) / 27
         linpt = z < brkpt
-        f = linpt ? f0 + fsp * z : brkfrq * exp(log(logstep) * (z - brkpt))
+        f = linpt ? f0 + fsp * z : brkfrq * exp(logstep * (z - brkpt))
     end
     return f
 end
