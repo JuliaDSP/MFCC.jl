@@ -123,9 +123,9 @@ function hz2mel(f::AbstractFloat, htk::Bool=false)
         fsp = 200 / 3
         brkfrq = 1000.0
         brkpt = (brkfrq - f0) / fsp
-        logstep = exp(log(6.4) / 27)
+        logstep = log(6.4) / 27
         linpt = f < brkfrq
-        z = linpt ? f / brkfrq / log(logstep) : brkpt + log(f / brkfrq) / log(logstep)
+        z = linpt ? f / brkfrq / logstep : brkpt + log(f / brkfrq) / logstep
     end
     return z
 end
