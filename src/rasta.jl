@@ -11,6 +11,7 @@
 using DSP
 using FFTW
 using LinearAlgebra
+using Memoization
 
 function powspec(x::AbstractVector{<:AbstractFloat}, sr::Real=8000.0;
                  wintime::Real=0.025, steptime::Real=0.01, dither::Real=true)
@@ -31,22 +32,19 @@ end
 
 # audspec tested against octave with simple vectors for all fbtypes
 function audspec(x::AbstractMatrix{<:AbstractFloat}, sr::Real=16000.0;
-                 nfilts=ceil(Int, hz2bark(sr / 2)), fbtype=:bark,
-                 minfreq=0., maxfreq=sr/2, sumpower::Bool=true, bwidth=1.0)
+                 nfilts=ceil(Int, hz2bark(sr / 2)), fbtype=:bark, sumpower::Bool=true, args...)
     nfreqs, nframes = size(x)
     nfft = 2(nfreqs-1)
-    if fbtype == :bark
-        wts = fft2barkmx(nfft, nfilts, sr=sr, width=bwidth, minfreq=minfreq, maxfreq=maxfreq)
+    wts = if fbtype == :bark
+        fft2barkmx(nfft, nfilts; sr=sr, args...)
     elseif fbtype == :mel
-        wts = fft2melmx(nfft, nfilts, sr=sr, width=bwidth, minfreq=minfreq, maxfreq=maxfreq)
+        fft2melmx(nfft, nfilts; sr=sr, args...)
     elseif fbtype == :htkmel
-        wts = fft2melmx(nfft, nfilts, sr=sr, width=bwidth, minfreq=minfreq, maxfreq=maxfreq,
-                        htkmel=true, constamp=true)
+        fft2melmx(nfft, nfilts; sr=sr, htkmel=true, constamp=true, args...)
     elseif fbtype == :fcmel
-        wts = fft2melmx(nfft, nfilts, sr=sr, width=bwidth, minfreq=minfreq, maxfreq=maxfreq,
-                        htkmel=true, constamp=false)
+        fft2melmx(nfft, nfilts; sr=sr, htkmel=true, constamp=false, args...)
     else
-        ArgumentError(string("Unknown filterbank type ", fbtype))
+        throw(ArgumentError(string("Unknown filterbank type ", fbtype)))
     end
     wts_v = view(wts, :, 1:nfreqs)
     if sumpower
@@ -56,7 +54,7 @@ function audspec(x::AbstractMatrix{<:AbstractFloat}, sr::Real=16000.0;
     end
 end
 
-function fft2barkmx(nfft::Integer, nfilts::Integer; sr=8000.0, width=1.0, minfreq=0., maxfreq=sr/2)
+@memoize function fft2barkmx(nfft::Integer, nfilts::Integer; sr=8000.0, bwidth=1.0, minfreq=0., maxfreq=sr/2)
     hnfft = nfft >> 1
     minbark = hz2bark(minfreq)
     nyqbark = hz2bark(maxfreq) - minbark
@@ -65,7 +63,7 @@ function fft2barkmx(nfft::Integer, nfilts::Integer; sr=8000.0, width=1.0, minfre
     binbarks = hz2bark.((0:hnfft) * sr / nfft)
     for i in axes(wts, 1), j in eachindex(binbarks)
         midbark = minbark + (i-1) * stepbark
-        mf = (binbarks[j] - midbark) / width
+        mf = (binbarks[j] - midbark) / bwidth
         lof, hif = mf - 0.5, mf + 0.5
         logwt = min(0, hif, -2.5lof)
         wts[i, j] = exp10(logwt)
@@ -86,7 +84,7 @@ function slope_gen(fs, fftfreq)
     max(0, min(loslope, hislope))
 end
 
-function fft2melmx(nfft::Integer, nfilts::Integer; sr=8000.0, width=1.0, minfreq=0.0,
+@memoize function fft2melmx(nfft::Integer, nfilts::Integer; sr=8000.0, bwidth=1.0, minfreq=0.0,
                    maxfreq=sr/2, htkmel::Bool=false, constamp::Bool=false)
     wts = zeros(nfilts, nfft)
     lastind = (nfft>>1)
@@ -101,7 +99,7 @@ function fft2melmx(nfft::Integer, nfilts::Integer; sr=8000.0, width=1.0, minfreq
     for i in axes(wts, 1)
         fs = binfreqs[i], binfreqs[i+1], binfreqs[i+2]
         # scale by width
-        fs = @. fs[2] + (fs - fs[2])width
+        fs = @. fs[2] + (fs - fs[2])bwidth
         for j in eachindex(fftfreqs)
             wts[i, j] = slope_gen(fs, fftfreqs[j])
         end
@@ -167,7 +165,7 @@ function postaud(x::AbstractMatrix{<:AbstractFloat}, fmax::Real, fbtype=:bark, b
     elseif fbtype in (:htkmel, :fcmel)
         bandcfhz = mel2hz.(range(0, stop=hz2mel(fmax, true), length=nfpts), true);
     else
-        ArgumentError(string("Unknown filterbank type: ", fbtype))
+        throw(ArgumentError(string("Unknown filterbank type: ", fbtype)))
     end
     # Remove extremal bands (the ones that will be duplicated)
     keepat!(bandcfhz, 1+broaden:nfpts-broaden)
@@ -247,7 +245,7 @@ function spec2cep(spec::AbstractMatrix{<:AbstractFloat}, ncep::Int=13, dcttype::
         end
         @. dctm[:, [1, nr]] /= 2
     else
-        DomainError(dcttype, "DCT type must be an integer from 1 to 4")
+        throw(DomainError(dcttype, "DCT type must be an integer from 1 to 4"))
     end
     # assume spec is not reused
     return dctm * map!(log, spec, spec)
@@ -259,13 +257,13 @@ function lifter(x::AbstractArray{<:AbstractFloat}, lift::Real=0.6, invs::Bool=fa
         return x
     elseif lift > 0
         if lift > 10
-            DomainError(lift, "Lift number is too high (>10)")
+            throw(DomainError(lift, "Lift number is too high (>10)"))
         end
         liftw = pushfirst!((1:ncep-1).^lift, 1)
     else
         # Hack to support HTK liftering
         if !isa(lift, Integer)
-            DomainError(lift, "Negative lift must be integer")
+            throw(DomainError(lift, "Negative lift must be integer"))
         end
         lift = -lift            # strictly speaking unnecessary...
         liftw = @. 1 + lift / 2 * sinpi((0:ncep-1) / lift)
@@ -284,10 +282,10 @@ end
 ## only returns a, v
 function levinson(acf::AbstractVector{<:Number}, p::Int)
     if isempty(acf)
-        ArgumentError("Empty autocorrelation function")
+        throw(ArgumentError("Empty autocorrelation function"))
     end
     if p < 0
-        DomainError(p, "Negative model order")
+        throw(DomainError(p, "Negative model order"))
     end
     if p < 100
         ## direct solution [O(p^3), but no loops so slightly faster for small p]

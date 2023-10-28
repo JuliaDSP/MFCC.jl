@@ -6,6 +6,7 @@
 using SpecialFunctions: erfinv
 using Distributed
 using DSP
+using Memoization
 
 ## This function accepts a vector of sample values, below we will generalize to arrays,
 ## i.e., multichannel data
@@ -27,7 +28,7 @@ function mfcc(x::AbstractVector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.
     end
     if modelorder > 0
         if dcttype != 1
-            ArgumentError("Sorry, modelorder>0 and dcttype ≠ 1 is not implemented")
+            throw(ArgumentError("Sorry, modelorder>0 and dcttype ≠ 1 is not implemented"))
         end
         # LPC analysis
         lpcas = dolpc(aspec, modelorder)
@@ -60,12 +61,12 @@ function mfcc(x::AbstractVector{<:AbstractFloat}, sr::AbstractFloat, defaults::S
     elseif defaults == :htk
         mfcc(x, sr; args...)
     else
-        ArgumentError(string("Unknown set of defaults: ", defaults))
+        throw(ArgumentError(string("Unknown set of defaults: ", defaults)))
     end
 end
 
 ## our features run down with time, this is essential for the use of DSP.filt()
-function deltas(x::AbstractMatrix{T}, w::Int=9) where {T<:AbstractFloat}
+function deltas(x::AbstractMatrix{T}, w::Integer=9) where {T<:AbstractFloat}
     nr, nc = size(x)
     if iszero(nr) || w <= 1
         return x
@@ -82,37 +83,29 @@ function deltas(x::AbstractMatrix{T}, w::Int=9) where {T<:AbstractFloat}
     return delta_v
 end
 
-sortperm_along(a::AbstractArray, dim::Int) =
+sortperm_along(a::AbstractArray, dim::Integer) =
 (v=similar(a, Int, size(a, dim)); mapslices(x->sortperm!(v, x), a; dims=dim))
 
-erfinvtabs = Dict{Int, Vector{Float64}}()
-function erfinvtab(wl::Int)
-    global erfinvtabs
-    if !haskey(erfinvtabs, wl)
-        erfinvtabs[wl] = @. √2 * erfinv(2(1:wl) / (wl + 1) - 1)
-    end
-    return erfinvtabs[wl]
-end
+@memoize Dict erfinvtab(wl::Integer) = @. √2 * erfinv(2(1:wl) / (wl + 1) - 1)
 
-function warpstats(x::AbstractMatrix{<:Real}, w::Int=399)
+function warpstats(x::AbstractMatrix{<:Real}, w::Integer=399)
     nx = size(x, 1)
     wl = min(w, nx)
     if nx < w
         rank = sortperm_along(x, 1)
     else
         rank = similar(x, Int)
-        hw = round(Int, (wl+1) / 2)
+        hw = (wl + 1) ÷ 2
         for j in axes(x, 2), i in 1:nx  # operations in outer loop over columns, better for memory cache
-            s = max(1, i - hw + 1)
+            s = max(0, i - hw)
             e = s + w - 1
-            if e > nx
-                d = e - nx
-                e -= d
-                s -= d
+            if e >= nx
+                s = nx - w
+                e = nx - 1
             end
             r = 1
             for k in s:e
-                if x[i, j] > x[k, j]
+                if x[begin+i-1, j] > x[begin+k, j]
                     r += 1
                 end
             end
@@ -122,20 +115,20 @@ function warpstats(x::AbstractMatrix{<:Real}, w::Int=399)
     return rank, erfinvtab(wl)
 end
 
-function warp(x::AbstractMatrix{<:Real}, w::Int=399)
+function warp(x::AbstractMatrix{<:Real}, w::Integer=399)
     rank, erfinvtab = warpstats(x, w)
     return erfinvtab[rank]
 end
-warp(x::AbstractVector{<:Real}, w::Int=399) = warp(reshape(x, :, 1), w)
+warp(x::AbstractVector{<:Real}, w::Integer=399) = warp(reshape(x, :, 1), w)
 
-function WarpedArray(x::AbstractMatrix{<:Real}, w::Int)
+function WarpedArray(x::AbstractMatrix{<:Real}, w::Integer)
     rank, erfinvtab = warpstats(x, w)
     WarpedArray(rank, erfinvtab)
 end
 
 ## mean and variance normalization
-znorm(x::AbstractArray, dim::Int=1) = znorm!(copy(x), dim)
-function znorm!(x::AbstractArray, dim::Int=1)
+znorm(x::AbstractArray, dim::Integer=1) = znorm!(copy(x), dim)
+function znorm!(x::AbstractArray, dim::Integer=1)
     mean_x = mean(x; dims=dim)
     std_x = std(x; dims=dim)
     @. x = (x - mean_x) / std_x
@@ -143,7 +136,7 @@ function znorm!(x::AbstractArray, dim::Int=1)
 end
 
 ## short-term mean and variance normalization
-function stmvn(x::AbstractVector{T}, w::Int=399) where T
+function stmvn(x::AbstractVector{T}, w::Integer=399) where T
     y = similar(x, promote_type(Float64, T))
     nx = length(x)
     nx ≤ 1 || w <= 1 && return copy!(y, x)
@@ -169,12 +162,12 @@ function stmvn(x::AbstractVector{T}, w::Int=399) where T
     return y
 end
 
-stmvn(m::AbstractMatrix, w::Int=399, dim::Int=1) = mapslices(x->stmvn(x, w), m; dims=dim)
+stmvn(m::AbstractMatrix, w::Integer=399, dim::Integer=1) = mapslices(x->stmvn(x, w), m; dims=dim)
 
 ## Shifted Delta Coefficients by copying
-function sdc(x::AbstractMatrix{T}, n::Int=7, d::Int=1, p::Int=3, k::Int=7) where {T<:AbstractFloat}
+function sdc(x::AbstractMatrix{T}, n::Integer=7, d::Integer=1, p::Integer=3, k::Integer=7) where {T<:AbstractFloat}
     nx, nfea = size(x)
-    n ≤ nfea || DomainError(n, "Not enough features for n")
+    n ≤ nfea || throw(DomainError(n, "Not enough features for n"))
     hnfill = (k - 1) * p / 2
     nfill1, nfill2 = floor(Int, hnfill), ceil(Int, hnfill)
     xx = vcat(zeros(T, nfill1, n), deltas(@view(x[:, begin:begin+n-1]), 2d+1), zeros(T, nfill2, n))

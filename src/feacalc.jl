@@ -18,7 +18,7 @@ function feacalc(wavfile::AbstractString; method=:wav, kwargs...)
     elseif method == :sphere
         sphread(wavfile)
     else
-        ArgumentError(string("Method not supported: ", method))
+        throw(ArgumentError(string("Method not supported: ", method)))
     end
     sr = Float64(sr)       # more reasonable sr
     feacalc(x; sr=sr, source=wavfile, kwargs...)
@@ -37,12 +37,12 @@ function feacalc(x::AbstractVecOrMat; augtype=:ddelta, normtype=:warp, sadtype=:
             x = x[:, begin+channum]
         elseif chan isa Integer
             if !(chan in 1:nchan)
-                DomainError(chan, "Bad channel specification")
+                throw(DomainError(chan, "Bad channel specification"))
             end
             x = x[:, begin+chan-1]
             chan = (:a, :b)[chan]
         else
-            ArgumentError(string("Unknown channel specification: ", chan))
+            throw(ArgumentError(string("Unknown channel specification: ", chan)))
         end
     else
         nsamples, nchan = length(x), 1
@@ -113,7 +113,7 @@ function feacalc(wavfile::AbstractString, application::Symbol; kwargs...)
     elseif application == :diarization
         feacalc(wavfile; defaults=:rasta, sadtype=:none, normtype=:mvn, augtype=:none, kwargs...)
     else
-        DomainError(application, "Unknown application ")
+        throw(ArgumentError(string("Unknown application: ", application)))
     end
 end
 
