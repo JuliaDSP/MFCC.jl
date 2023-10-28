@@ -217,22 +217,18 @@ function lpc2cep(a::AbstractMatrix{T}, ncep::Int=0) where {T<:AbstractFloat}
     return c'
 end
 
-function spec2cep(spec::AbstractMatrix{<:AbstractFloat}, ncep::Int=13, dcttype::Int=2)
-    # no discrete cosine transform option
-    dcttype == -1 && return map!(log, spec, spec)
-
-    nr, nc = size(spec)
-    dctm = similar(spec, ncep, nr)
+@memoize function dct_matrix(dcttype::Int, ncep::Int, nr::Int, ::Type{T}) where T
+    dctm = Matrix{T}(undef, ncep, nr)
     if 1 < dcttype < 4          # type 2,3
         for j in 1:nr, i in 1:ncep
-            dctm[i, j] = cospi((i - 1) * (2j-1) / (2nr)) * √(2/nr)
+            dctm[i, j] = cospi((i-1) * (2j-1) / (2nr)) * √(2 / nr)
         end
         if dcttype == 2
             @. dctm[1, :] /= √2
         end
     elseif dcttype == 4         # type 4
         for j in 1:nr, i in 1:ncep
-            dctm[i, j] = 2cospi((i-1) * j/(nr+1))
+            dctm[i, j] = 2cospi((i-1) * j / (nr + 1))
         end
         for i in axes(dctm, 1)
             dctm[i, end] += (-1)^(i-1)
@@ -247,6 +243,14 @@ function spec2cep(spec::AbstractMatrix{<:AbstractFloat}, ncep::Int=13, dcttype::
     else
         throw(DomainError(dcttype, "DCT type must be an integer from 1 to 4"))
     end
+    dctm
+end
+
+function spec2cep(spec::AbstractMatrix{T}, ncep::Int=13, dcttype::Int=2) where {T<:AbstractFloat}
+    # no discrete cosine transform option
+    dcttype == -1 && return map!(log, spec, spec)
+    nr, nc = size(spec)
+    dctm = dct_matrix(dcttype, ncep, nr, T)
     # assume spec is not reused
     return dctm * map!(log, spec, spec)
 end
