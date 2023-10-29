@@ -13,6 +13,23 @@ y = feaload("bl2.mfcc")
 
 @assert x == y
 
+t_fn = "bl2.hdf5"
+
+feasave(t_fn, x; meta=meta, params=params)
+mfcc_tup = feaload(t_fn; meta=true, params=true)
+
+@assert feasize(t_fn) == size(y)
+@assert mfcc_tup == (x, meta, params)
+
+rm(t_fn)
+
+feacalc(x)
+feacalc("bl2.wav")
+y = wavread("bl2.wav")[1]
+mfcc(y; fbtype=:bark)
+mfcc(y; fbtype=:mel)
+mfcc(y; fbtype=:fcmel)
+
 z = warp(x)
 z = deltas(x)
 z = znorm(x)

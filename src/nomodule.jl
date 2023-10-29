@@ -3,7 +3,7 @@
 using DSP
 using HDF5
 
-if !isdefined(:WarpedArray)
+if !@isdefined WarpedArray
     include("types.jl")
 end
 

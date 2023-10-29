@@ -17,87 +17,87 @@ function feacalc(wavfile::AbstractString; method=:wav, kwargs...)
         soxread(wavfile)
     elseif method == :sphere
         sphread(wavfile)
+    else
+        throw(ArgumentError(string("Method not supported: ", method)))
     end
     sr = Float64(sr)       # more reasonable sr
     feacalc(x; sr=sr, source=wavfile, kwargs...)
 end
 
 ## assume we have an array already
-function feacalc(x::AbstractArray; augtype=:ddelta, normtype=:warp, sadtype=:energy,
+function feacalc(x::AbstractVecOrMat; augtype=:ddelta, normtype=:warp, sadtype=:energy,
                  dynrange::Real=30., nwarp::Int=399, chan=:mono, sr::AbstractFloat=8000.0,
                  source=":array", defaults=:nbspeaker, mfccargs...)
-    if ndims(x) > 1
+    if x isa AbstractMatrix
         nsamples, nchan = size(x)
         if chan == :mono
             x = vec(mean(x; dims=2))            # average multiple channels for now
         elseif chan in (:a, :b)
-            channum = chan == :a ? 1 : 2
-            x = x[:,channum]
+            channum = chan == :b
+            x = x[:, begin+channum]
         elseif chan isa Integer
             if !(chan in 1:nchan)
-                error("Bad channel specification: ", chan)
+                throw(DomainError(chan, "Bad channel specification"))
             end
-            x = x[:,chan]
+            x = x[:, begin+chan-1]
             chan = (:a, :b)[chan]
         else
-            error("Unknown channel specification: ", chan)
+            throw(ArgumentError(string("Unknown channel specification: ", chan)))
         end
     else
         nsamples, nchan = length(x), 1
     end
     ## save some metadata
-    meta = Dict("nsamples" => nsamples, "sr" => sr, "source" => source,
-                "nchan" => nchan, "chan" => chan)
+    meta = Dict(:nsamples => nsamples, :sr => sr, :source => source,
+                :nchan => nchan, :chan => chan)
     preemph = 0.97
     preemph ^= 16000. / sr
 
     ## basic features
     m, pspec, params = mfcc(x, sr, defaults; preemph=preemph, mfccargs...)
-    meta["totnframes"] = nrow(m)
+    meta[:totnframes] = nrow(m)
 
     ## augment features
     if augtype in (:delta, :ddelta)
         d = deltas(m)
-        if augtype==:ddelta
+        if augtype == :ddelta
             dd = deltas(d)
             m = hcat(m, d, dd)
         else
             m = hcat(m, d)
         end
-    elseif augtype==:sdc
+    elseif augtype == :sdc
         m = sdc(m)
     end
-    meta["augtype"] = augtype
+    meta[:augtype] = augtype
 
-    if nrow(m)>0
-        if sadtype==:energy
+    if !isempty(m)
+        if sadtype == :energy
             speech = sad(pspec, sr; dynrange=dynrange)
-            params["dynrange"] = dynrange
-        elseif sadtype==:none
-            speech = collect(1:nrow(m))
+            params[:dynrange] = dynrange
+            ## perform SAD
+            m = m[speech,:]
+            meta[:speech] = map(UInt32, speech)
+        elseif sadtype == :none
+            nothing
         end
-    else
-        speech=Int[]
     end
-    meta["sadtype"] = sadtype
-    ## perform SAD
-    m = m[speech,:]
-    meta["speech"] = map(UInt32, speech)
-    meta["nframes"], meta["nfea"] = size(m)
+    meta[:sadtype] = sadtype
+    meta[:nframes], meta[:nfea] = size(m)
 
     ## normalization
-    if !iszero(nrow(m))
+    if !isempty(m)
         if normtype == :warp
             m = warp(m, nwarp)
-            params["warp"] = nwarp          # the default
+            params[:warp] = nwarp          # the default
         elseif normtype == :mvn
-            if nrow(m)>1
-                znorm!(m,1)
+            if nrow(m) > 1
+                znorm!(m, 1)
             else
                 fill!(m, 0)
             end
         end
-        meta["normtype"] = normtype
+        meta[:normtype] = normtype
     end
     return (map(Float32, m), meta, params)
 end
@@ -113,11 +113,11 @@ function feacalc(wavfile::AbstractString, application::Symbol; kwargs...)
     elseif application == :diarization
         feacalc(wavfile; defaults=:rasta, sadtype=:none, normtype=:mvn, augtype=:none, kwargs...)
     else
-        error("Unknown application ", application)
+        throw(ArgumentError(string("Unknown application: ", application)))
     end
 end
 
-function sad(pspec::AbstractMatrix{T}, sr::T, method=:energy; dynrange::T=30.) where T<:Float64
+function sad(pspec::AbstractMatrix, sr::T, method=:energy; dynrange::T=30.) where T<:Float64
     ## integrate power
     deltaf = size(pspec, 2) / (sr/2)
     minfreqi = round(Int, 300deltaf)
@@ -125,8 +125,7 @@ function sad(pspec::AbstractMatrix{T}, sr::T, method=:energy; dynrange::T=30.) w
     summed_pspec = vec(sum(view(pspec, :, minfreqi:maxfreqi); dims=2))
     power = @. 10log10(summed_pspec)
     maxpow = maximum(power)
-    activity = power .> maxpow - dynrange
-    speech = findall(activity)
+    speech = findall(>(maxpow - dynrange), power)
     return speech
 end
 
@@ -136,8 +135,8 @@ function sad(wavfile::AbstractString, speechout::AbstractString, silout::Abstrac
     sr = Float64(sr)                            # more reasonable sr
     mx::Vector{Float64} = vec(mean(x; dims=2))  # average multiple channels for now
     m, pspec, meta = mfcc(mx, sr; preemph=0)
-    sp = sad(pspec, sr, dynrange=dynrange)
-    sl = round(Int, meta["steptime"] * sr)
+    sp = sad(pspec, sr; dynrange=dynrange)
+    sl = round(Int, meta[:steptime] * sr)
     xi = falses(axes(mx))
     for i in @view sp[begin:end-1]
         z = (i - 1) * sl
