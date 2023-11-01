@@ -13,9 +13,9 @@ using Memoization
 ## Recoded from rastamat's "melfcc.m" (c) Dan Ellis.
 ## Defaults here are HTK parameters, this is contrary to melfcc
 function mfcc(x::AbstractVector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numcep=13,
-              lifterexp=-22, preemph=0.97, minfreq=0.0, maxfreq=sr/2, nbands=20,
-              bwidth=1.0, dcttype=3, fbtype=:htkmel, modelorder=0, sumpower::Bool=false,
-              dither::Bool=false, usecmp::Bool=false) where {T<:AbstractFloat}
+              preemph=0.97, lifterexp=-22, nbands=20, minfreq=0.0, maxfreq=sr/2,
+              fbtype=:htkmel, bwidth=1.0, modelorder=0, dcttype=3, dither::Real=false,
+              sumpower::Bool=false, usecmp::Bool=false) where {T<:AbstractFloat}
     if !iszero(preemph)
         x = filt(PolynomialRatio([1., -preemph], [1.]), x)
     end
@@ -29,6 +29,8 @@ function mfcc(x::AbstractVector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.
     if modelorder > 0
         if dcttype != 1
             throw(ArgumentError("Sorry, modelorder>0 and dcttype ≠ 1 is not implemented"))
+        elseif numcep > modelorder
+            throw(ArgumentError("modelorder cannot be less than numceps"))
         end
         # LPC analysis
         lpcas = dolpc(aspec, modelorder)
@@ -46,7 +48,7 @@ function mfcc(x::AbstractVector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.
     return (cepstra, pspec', meta)
 end
 
-mfcc(x::AbstractMatrix{<:AbstractFloat}, sr::Real=16000.0; args...) = @distributed (tuple) for i in axes(x, 2) mfcc(x[:, i], sr; args...) end
+mfcc(x::AbstractMatrix{<:AbstractFloat}, args...; kwargs...) = @distributed (tuple) for i in axes(x, 2) mfcc(x[:, i], args...; kwargs...) end
 
 
 ## default feature configurations, :rasta, :htk, :spkid_toolkit, :wbspeaker

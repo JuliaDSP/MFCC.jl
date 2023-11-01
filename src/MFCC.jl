@@ -13,7 +13,7 @@ export feacalc
 using DSP
 using WAV
 using SpecialFunctions ## erfinv
-using Statistics  
+using Statistics
 
 include("rasta.jl")
 include("mfccs.jl")
