@@ -155,7 +155,7 @@ function hynek_eql(bandcfhz)
     eql
 end
 
-function postaud(x::AbstractMatrix{<:AbstractFloat}, fmax::Real, fbtype=:bark, broaden=false)
+function postaud(x::AbstractMatrix{<:AbstractFloat}, fmax::Real, fbtype=:bark, broaden::Bool=false)
     nbands, nframes = size(x)
     nfpts = nbands + 2broaden
     if fbtype == :bark
@@ -256,7 +256,7 @@ function spec2cep(spec::AbstractMatrix{T}, ncep::Int=13, dcttype::Int=2) where {
 end
 
 function lifter(x::AbstractArray{<:AbstractFloat}, lift::Real=0.6, invs::Bool=false)
-    ncep, nf = size(x)
+    ncep = nrow(x)
     if iszero(lift)
         return x
     elseif lift > 0
