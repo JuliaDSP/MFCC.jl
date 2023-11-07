@@ -130,7 +130,7 @@ function sad(pspec::AbstractMatrix, sr::T, method=:energy; dynrange::T=30.) wher
 end
 
 ## listen to SAD
-function sad(wavfile::AbstractString, speechout, silout; dynrange::Float64=30.)
+function sad(wavfile, speechout, silout; dynrange::Float64=30.)
     x, sr, nbits = wavread(wavfile)
     sr = Float64(sr)                            # more reasonable sr
     mx::Vector{Float64} = vec(mean(x; dims=2))  # average multiple channels for now

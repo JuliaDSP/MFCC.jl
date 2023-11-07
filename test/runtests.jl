@@ -26,12 +26,13 @@ mfcc_tup = feaload(t_fn; meta=true, params=true)
 
 rm(t_fn)
 
-y, sr = wavread("bl2.wav"); sr = Float64(sr)
+y, sr = wavread("bl2.wav"); y_mat = y
+y, sr = vec(y), Float64(sr)
 
 # test feacalc with different parameters
-feacalc(vec(y); normtype=:mvn)
-feacalc(y; sr=sr, chan=1)
-feacalc(y; sr=sr, chan=:a, augtype=:sdc)
+feacalc(y; normtype=:mvn)
+feacalc(y_mat; sr=sr, chan=1)
+feacalc(y_mat; sr=sr, chan=:a, augtype=:sdc)
 feacalc(y; sr=sr, usecmp=true, modelorder=20, dcttype=1)
 
 # test mfcc with htk, matrix input
@@ -58,17 +59,18 @@ x = randn(100000)
 l = levinson(x, 101)
 z = lifter(x, 0.6, true)
 z = stmvn(x, 400000)
-z = warp(x)
+z = warp(randn(1000))
 p = powspec(x)
 a = audspec(p)
 a = postaud(p, 8000, :bark, true)
 
 # test for invalid/unsupported arguments
-@test_throws DomainError feacalc(y; sr=sr, chan=2)
-@test_throws ArgumentError feacalc(y; sr=sr, chan=nothing)
+@test_throws DomainError feacalc(y_mat; sr=sr, chan=2)
+@test_throws ArgumentError feacalc(y_mat; sr=sr, chan=nothing)
 @test_throws ArgumentError feacalc(y; sr=sr, usecmp=true, modelorder=1, dcttype=1)
 @test_throws ArgumentError feacalc(y; sr=sr, usecmp=true, modelorder=1, dcttype=2)
 @test_throws ArgumentError feacalc("bl2.wav", :bosespeaker)
+@test_throws ArgumentError mfcc(y, sr, :pasta)
 @test_throws ArgumentError postaud(a, 4000, :cough)
 @test_throws "Lift number is too high (>10)" lifter(y, 100)
 @test_throws "Negative lift must be integer" lifter(y, -0.6)
