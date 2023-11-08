@@ -24,12 +24,12 @@ Extract MFCC features from the audio data in `x`, using parameter settings chara
 The actual routine for MFCC computation has many parameters, these are basically the same parameters as in Dan Ellis's rastamat package.
 
 ```julia
-mfcc(x::Vector, sr=16000.0; wintime=0.025, steptime=0.01, numcep=13, lifterexp=-22, sumpower=false, preemph=0.97, dither=false, minfreq=0.0, maxfreq=sr/2, nbands=20, bwidth=1.0, dcttype=3, fbtype=:htkmel, usecmp=false, modelorder=0)
+mfcc(x::AbstractVector{<:AbstractFloat}, sr::Real=16000.0; wintime=0.025, steptime=0.01, numcep=13, preemph=0.97, lifterexp=-22, nbands=20, minfreq=0.0, maxfreq=sr/2, fbtype=:htkmel, bwidth=1.0, modelorder=0, dcttype=3, dither::Real=false, sumpower::Bool=false, usecmp::Bool=false)
 ```
 
   This is the main routine computing MFCCs.  `x` should be a 1D vector of `FloatingPoint` samples of speech, sampled at a frequency of `sr`.  Every `steptime` seconds, a frame of duration `wintime` is analysed.  The log energy in a filterbank of `nbands` bins is computed, and a cepstral (discrete cosine transform) representation is made, keeping only the first `numcep` coefficients (including log energy).  The result is a tuple of three values:
 
- - a matrix of `numcep` columns with for each speech frame a row of MFCC coefficients
+ - a matrix with `numcep` columns and for each speech frame a row of MFCC coefficients
  - the power spectrum computed with `DSP.spectrogram()` from which the MFCCs are computed
  - a dictionary containing information about the parameters used for extracting the features.
 
@@ -46,7 +46,7 @@ This will compute speech features suitable for a specific `application`, which c
 - `:language`: narrowband language recognition: Shifted Delta Cepstra, energy-based speech activity detection, feature warping (299 samples)
 - `:diarization`: 13 MFCCs, utterance mean and variance normalization
 
-The `kwargs...` parameters allow for various options in file format, feature augmentation, speech activity detection and MFCC parameter settings.  They trickle down to versions of `feacalc()` and `mfcc()` allow for more detailed specification of these parameters.
+The `kwargs...` parameters allow for various options in file format, feature augmentation, speech activity detection and MFCC parameter settings.  They trickle down to versions of `feacalc()` and `mfcc()`, allowing for more detailed specification of these parameters.
 
 `feacalc()` returns a tuple of three structures:
 - a `Matrix` of features, one row per frame
@@ -58,7 +58,7 @@ The `kwargs...` parameters allow for various options in file format, feature aug
 ```julia
 feacalc(wavfile::AbstractString; method=:wav, kwargs...)
 ```
-This function reads an audio file from disk and represents the audio as an `Array`, and then runs the feature extraction.
+This function reads an audio file from disk and represents the audio as a `Matrix`, and then runs the feature extraction.
 
 The `method` parameter determines what method is used for reading in the audio file:
 - `:wav`: use Julia's native [WAV](https://github.com/dancasimiro/WAV.jl) library to read RIFF/WAVE `.wav` files
@@ -88,7 +88,7 @@ The `sad` parameter controls if Speech Activity Detection is carried out on the 
 - `:none`: apply no SAD
 - `:energy`: apply energy based SAD, omitting frames with an energy less than `dynrange` below the maximum energy of the file.
 
-The various applications actually have somewhat different parameter settings for the basic MFCC feature extraction, see the `defaults` parameter of `mfcc()` below.
+The various applications actually have somewhat different parameter settings for the basic MFCC feature extraction, see the `defaults` parameter of `mfcc()` above.
 
 ### Feature warping, or short-time Gaussianization (Jason Pelecanos)
 ```julia
@@ -127,4 +127,4 @@ SDCs are features used for spoken language recognition, typically derived from M
 sdc(x::Matrix, n::Int=7, d::Int=1, p::Int=3, k::Int=7)
 ```
 
-This function expands (MFCC) features in `x` by computing derivatives over `2d+1` consecutive frames for the first `n` columns of `x`, stacking derivatives shifted over `p` frames `k` times.  Before the calculation, zero adding is added so that the number of rows of the resuls is the same as for `x`.
+This function expands (MFCC) features in `x` by computing derivatives over `2d+1` consecutive frames for the first `n` columns of `x`, stacking derivatives shifted over `p` frames `k` times.  Before the calculation, the deltas are zero padded so that the results have the same number of rows as `x`.

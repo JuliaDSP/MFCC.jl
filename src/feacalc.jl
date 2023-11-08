@@ -40,7 +40,7 @@ function feacalc(x::AbstractVecOrMat; augtype=:ddelta, normtype=:warp, sadtype=:
                 throw(DomainError(chan, "Bad channel specification"))
             end
             x = x[:, begin+chan-1]
-            chan = (:a, :b)[chan]
+            chan = chan in 1:2 ? (:a, :b)[chan] : chan
         else
             throw(ArgumentError(string("Unknown channel specification: ", chan)))
         end
@@ -106,7 +106,7 @@ end
 function feacalc(wavfile::AbstractString, application::Symbol; kwargs...)
     if application in (:speaker, :nbspeaker)
         feacalc(wavfile; defaults=:nbspeaker, kwargs...)
-    elseif application==:wbspeaker
+    elseif application == :wbspeaker
         feacalc(wavfile; defaults=:wbspeaker, kwargs...)
     elseif application == :language
         feacalc(wavfile; defaults=:rasta, nwarp=299, augtype=:sdc, kwargs...)
@@ -130,7 +130,7 @@ function sad(pspec::AbstractMatrix, sr::T, method=:energy; dynrange::T=30.) wher
 end
 
 ## listen to SAD
-function sad(wavfile::AbstractString, speechout::AbstractString, silout::AbstractString; dynrange::Float64=30.)
+function sad(wavfile, speechout, silout; dynrange::Float64=30.)
     x, sr, nbits = wavread(wavfile)
     sr = Float64(sr)                            # more reasonable sr
     mx::Vector{Float64} = vec(mean(x; dims=2))  # average multiple channels for now
