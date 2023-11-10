@@ -50,7 +50,8 @@ function audspec(x::AbstractMatrix{<:AbstractFloat}, sr::Real=16000.0;
     if sumpower
         return wts_v * x
     else
-        return (wts_v * sqrt.(x)).^2
+        aspec = wts_v * sqrt.(x)
+        return map!(x->x^2, aspec, aspec)
     end
 end
 

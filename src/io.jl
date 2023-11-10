@@ -11,9 +11,9 @@ import HDF5
 HDF5.write(fd::HDF5.File, s::AbstractString, sym::Symbol) = write(fd, string(s,":Symbol"), string(sym))
 
 ## always save data in Float32
-## the functiona arguments are the same as the output of feacalc
+## the function arguments are the same as the output of feacalc
 ## x: the MFCC data
-## meta: a dict with parameters anout the data, nsamples, nframes, totnframes (before sad), ...
+## meta: a dict with parameters about the data, nsamples, nframes, totnframes (before sad), ...
 ## params: a dict with parameters about the feature extraction itself.
 function feasave(file::AbstractString, x::AbstractMatrix{<:AbstractFloat}; meta::Dict=Dict(), params::Dict=Dict())
     dir = dirname(file)

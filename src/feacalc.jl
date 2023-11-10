@@ -10,7 +10,7 @@ ncol(x) = size(x, 2)
 compute features according to standard settings directly from a wav file.
 this does channel at the time.
 """
-function feacalc(wavfile::AbstractString; method=:wav, kwargs...)
+function feacalc(wavfile; method=:wav, kwargs...)
     x, sr = if method == :wav
         wavread(wavfile)
     elseif method == :sox
@@ -103,7 +103,7 @@ function feacalc(x::AbstractVecOrMat; augtype=:ddelta, normtype=:warp, sadtype=:
 end
 
 ## When called with a specific application in mind, call with two arguments
-function feacalc(wavfile::AbstractString, application::Symbol; kwargs...)
+function feacalc(wavfile, application::Symbol; kwargs...)
     if application in (:speaker, :nbspeaker)
         feacalc(wavfile; defaults=:nbspeaker, kwargs...)
     elseif application == :wbspeaker
