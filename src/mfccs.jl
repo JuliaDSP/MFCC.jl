@@ -77,7 +77,7 @@ function deltas(x::AbstractMatrix{T}, w::Integer=9) where {T<:AbstractFloat}
     end
     hlen = w ÷ 2
     w = 2hlen + 1                 # make w odd
-    win = collect(convert(T, hlen):-1:-hlen)
+    win = collect(T, hlen:-1:-hlen)
     x1 = x[begin:begin, :]
     xend = x[end:end, :]
     xx = vcat(repeat(x1, hlen), x, repeat(xend, hlen)) ## take care of boundaries
