@@ -48,8 +48,10 @@ function feacalc(x::AbstractVecOrMat; augtype=:ddelta, normtype=:warp, sadtype=:
         nsamples, nchan = length(x), 1
     end
     ## save some metadata
-    meta = Dict(:nsamples => nsamples, :sr => sr, :source => source,
-                :nchan => nchan, :chan => chan)
+    meta = Dict{Symbol, Any}(
+        :nsamples => nsamples, :sr => sr, :source => source,
+        :nchan => nchan, :chan => chan
+        )
     preemph = 0.97
     preemph ^= 16000. / sr
 
