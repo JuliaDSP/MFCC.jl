@@ -50,7 +50,8 @@ function audspec(x::AbstractMatrix{<:AbstractFloat}, sr::Real=16000.0;
     if sumpower
         return wts_v * x
     else
-        return (wts_v * sqrt.(x)).^2
+        aspec = wts_v * sqrt.(x)
+        return map!(x->x^2, aspec, aspec)
     end
 end
 
@@ -179,21 +180,22 @@ function postaud(x::AbstractMatrix{<:AbstractFloat}, fmax::Real, fbtype=:bark, b
     if broaden
         z = z[[begin; begin:end; end], :];
     else
-        z = z[[begin+1; begin+1:end-1; end-1], :]
+        @views z[[begin, end], :] = z[[begin+1, end-1], :]
     end
     return z
 end
 
 function dolpc(x::AbstractMatrix{<:AbstractFloat}, modelorder::Int=8)
     nbands, nframes = size(x)
-    r = real(ifft(x[[begin:end; end-1:-1:begin+1], :], 1)[begin:begin+nbands-1, :])
+    r = FFTW.r2r(x, FFTW.REDFT00, 1)
+    r ./= 2(nbands - 1)
     # Find LPC coeffs by durbin
     y, e = levinson(r, modelorder)
     # Normalize each poly by gain
     y ./= e
 end
 
-function lpc2cep(a::AbstractMatrix{T}, ncep::Int=0) where {T<:AbstractFloat}
+@views function lpc2cep(a::AbstractMatrix{T}, ncep::Int=0) where {T<:AbstractFloat}
     nlpc, nc = size(a)
     order = nlpc - 1
     if iszero(ncep)
@@ -201,15 +203,15 @@ function lpc2cep(a::AbstractMatrix{T}, ncep::Int=0) where {T<:AbstractFloat}
     end
     c = zeros(nc, ncep)
     a = copy(a')
+    sum_var = collect(T, a[:, begin])
     # Code copied from HSigP.c: LPC2Cepstrum
     # First cep is log(Error) from Durbin
-    @views @. c[:, begin] = -log(a[:, begin])
+    @. c[:, begin] = -log(sum_var)
     # Renormalize lpc A coeffs
-    @. a /= a[:, begin]
-    sum_var = Vector{T}(undef, nc)
-    @views for i in 2:ncep
+    @. a /= sum_var
+    for i in 2:ncep
         fill!(sum_var, zero(T))
-        for m in 2:i
+        for m in 2:i-1
             @. sum_var += (i - m) * a[:, m] * c[:, i - m + 1]
         end
         @. c[:, i] = -a[:, i] - sum_var / (i - 1)
@@ -284,35 +286,33 @@ end
 ## "You are welcome to move my octave code from GPL to MIT like core Julia."
 ## untested
 ## only returns a, v
-function levinson(acf::AbstractVector{<:Number}, p::Int)
+@views function levinson(acf::AbstractVector{<:Number}, p::Int)
     if isempty(acf)
         throw(ArgumentError("Empty autocorrelation function"))
-    end
-    if p < 0
+    elseif p < 0
         throw(DomainError(p, "Negative model order"))
-    end
-    if p < 100
+    elseif p < 100
         ## direct solution [O(p^3), but no loops so slightly faster for small p]
         ## Kay & Marple Eqn (2.39)
-        R = toeplitz(@view acf[begin:begin+p-1])
-        a = R \ @view acf[begin+1:begin+p]
+        R = toeplitz(acf[begin:begin+p-1])
+        a = R \ acf[begin+1:begin+p]
         @. a = -a
         pushfirst!(a, 1)
-        v = @. real(a*conj(@view acf[begin:begin+p]))
+        v = @. real(a*conj(acf[begin:begin+p]))
     else
         ## durbin-levinson [O(p^2), so significantly faster for large p]
         ## Kay & Marple Eqns (2.42-2.46)
         # ref = zeros(p)
         g = -acf[begin+1] / acf[begin]
-        a = [1, g]; sizehint!(a, p+1)
+        a = zeros(p+1); a[1] = 1; a[2] = g
+        buf = similar(a)
         v = real((1 - abs2(g)) * acf[begin])
         # ref[begin] = g  # is not used???
         for t in 2:p
-            g = -(acf[begin+t] + @views a[2:end] ⋅ acf[begin+t-1:-1:begin+1]) / v
-            for i in 2:t
-                a[i] = a[i] + g * conj(a[end-i+2])
-            end
-            push!(a, g)
+            g = -(acf[begin+t] + a[2:t] ⋅ acf[begin+t-1:-1:begin+1]) / v
+            @. buf[2:t] = g * conj(a[t:-1:2])
+            @. a[2:t] += buf[2:t]
+            a[t+1] = g
             v *= 1 - abs2(g)
             # ref[t] = g
         end
@@ -325,7 +325,9 @@ function levinson(acf::AbstractMatrix{<:Number}, p::Integer)
     a = zeros(p + 1, nc)
     v = zeros(p + 1, nc)
     for i in axes(acf, 2)
-        a[:, i], v[:, i] = levinson(view(acf, :, i), p)
+        a_i, v_i = levinson(view(acf, :, i), p)
+        a[:, i] = a_i
+        v[:, i] .= v_i
     end
     return a, v
 end

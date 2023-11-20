@@ -17,7 +17,7 @@ function mfcc(x::AbstractVector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.
               fbtype=:htkmel, bwidth=1.0, modelorder=0, dcttype=3, dither::Real=false,
               sumpower::Bool=false, usecmp::Bool=false) where {T<:AbstractFloat}
     if !iszero(preemph)
-        x = filt(PolynomialRatio([1., -preemph], [1.]), x)
+        x = filt([1., -preemph], 1., x)
     end
     pspec = powspec(x, sr; wintime=wintime, steptime=steptime, dither=dither)
     aspec = audspec(pspec, sr; nfilts=nbands, fbtype=fbtype, minfreq=minfreq,
@@ -40,11 +40,13 @@ function mfcc(x::AbstractVector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.
         cepstra = spec2cep(aspec, numcep, dcttype)
     end
     cepstra = lifter(cepstra, lifterexp)
-    meta = Dict(:sr => sr, :wintime => wintime, :steptime => steptime, :numcep => numcep,
-                :lifterexp => lifterexp, :sumpower => sumpower, :preemph => preemph,
-                :dither => dither, :minfreq => minfreq, :maxfreq => maxfreq, :nbands => nbands,
-                :bwidth => bwidth, :dcttype => dcttype, :fbtype => fbtype,
-                :usecmp => usecmp, :modelorder => modelorder)
+    meta = Dict{Symbol, Any}(
+        :sr => sr, :wintime => wintime, :steptime => steptime, :numcep => numcep,
+        :lifterexp => lifterexp, :sumpower => sumpower, :preemph => preemph,
+        :dither => dither, :minfreq => minfreq, :maxfreq => maxfreq, :nbands => nbands,
+        :bwidth => bwidth, :dcttype => dcttype, :fbtype => fbtype,
+        :usecmp => usecmp, :modelorder => modelorder
+        )
     return (cepstra, pspec', meta)
 end
 
@@ -75,12 +77,12 @@ function deltas(x::AbstractMatrix{T}, w::Integer=9) where {T<:AbstractFloat}
     end
     hlen = w ÷ 2
     w = 2hlen + 1                 # make w odd
-    win = collect(convert(T, hlen):-1:-hlen)
+    win = collect(T, hlen:-1:-hlen)
     x1 = x[begin:begin, :]
     xend = x[end:end, :]
     xx = vcat(repeat(x1, hlen), x, repeat(xend, hlen)) ## take care of boundaries
     norm = 3 / (hlen * w * (hlen + 1))
-    delta_v = filt(PolynomialRatio(win, [1.]), xx)[begin+2hlen:end, :]
+    delta_v = filt(win, 1., xx)[begin+2hlen:end, :]
     @. delta_v *= norm
     return delta_v
 end
