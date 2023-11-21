@@ -14,6 +14,7 @@ using DSP
 using WAV
 using SpecialFunctions ## erfinv
 using Statistics
+using Compat
 
 include("rasta.jl")
 include("mfccs.jl")

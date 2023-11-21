@@ -80,8 +80,8 @@ end
     @test_throws ArgumentError feacalc("bl2.wav", :bosespeaker)
     @test_throws ArgumentError mfcc(y, sr, :pasta)
     @test_throws ArgumentError postaud(y_mat, 4000, :cough)
-    @test_throws "Lift number is too high (>10)" lifter(y, 100)
-    @test_throws "Negative lift must be integer" lifter(y, -0.6)
+    @test_throws DomainError lifter(y, 100)
+    @test_throws DomainError lifter(y, -0.6)
     @test_throws ArgumentError levinson(Int[], 1)
     @test_throws DomainError levinson(x, -1)
 end
