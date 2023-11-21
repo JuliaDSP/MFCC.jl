@@ -282,7 +282,7 @@ function lifter(x::AbstractArray{<:AbstractFloat}, lift::Real=0.6, invs::Bool=fa
 end
 
 ## Freely after octave's implementation, by Paul Kienzle <pkienzle@users.sf.net>
-## Permission granted to usee this in a MIT license on 20 dec 2013 by the author Paul Kienzle:
+## Permission granted to use this in a MIT license on 20 dec 2013 by the author Paul Kienzle:
 ## "You are welcome to move my octave code from GPL to MIT like core Julia."
 ## untested
 ## only returns a, v
@@ -292,42 +292,55 @@ end
     elseif p < 0
         throw(DomainError(p, "Negative model order"))
     elseif p < 100
-        ## direct solution [O(p^3), but no loops so slightly faster for small p]
-        ## Kay & Marple Eqn (2.39)
-        R = toeplitz(acf[begin:begin+p-1])
-        a = R \ acf[begin+1:begin+p]
-        @. a = -a
-        pushfirst!(a, 1)
-        v = @. real(a*conj(acf[begin:begin+p]))
+        a, v = _levinson_small(acf, p)
     else
-        ## durbin-levinson [O(p^2), so significantly faster for large p]
-        ## Kay & Marple Eqns (2.42-2.46)
-        # ref = zeros(p)
-        g = -acf[begin+1] / acf[begin]
-        a = zeros(p+1); a[1] = 1; a[2] = g
-        buf = similar(a)
-        v = real((1 - abs2(g)) * acf[begin])
-        # ref[begin] = g  # is not used???
-        for t in 2:p
-            g = -(acf[begin+t] + a[2:t] ⋅ acf[begin+t-1:-1:begin+1]) / v
-            @. buf[2:t] = g * conj(a[t:-1:2])
-            @. a[2:t] += buf[2:t]
-            a[t+1] = g
-            v *= 1 - abs2(g)
-            # ref[t] = g
-        end
+        a, v = _levinson_large(acf, p)
     end
     return a, v
+end
+
+"""
+Direct solution [O(p^3), but no loops so slightly faster for small p]
+## Kay & Marple Eqn (2.39)
+"""
+@views function _levinson_small(acf::AbstractVector{<:Number}, p::Int)
+    R = toeplitz(acf[begin:begin+p-1])
+    a = R \ acf[begin+1:begin+p]
+    @. a = -a
+    pushfirst!(a, 1)
+    v = real(dot(acf[begin:begin+p], a))
+    a, v
+end
+
+"""
+Durbin-Levinson [O(p^2), so significantly faster for large p]
+## Kay & Marple Eqns (2.42-2.46)
+"""
+@views function _levinson_large(acf::AbstractVector{<:Number}, p::Int)
+    g = -acf[begin+1] / acf[begin]
+    a = zeros(p + 1); a[1] = 1; a[2] = g
+    buf = similar(a)
+    v = real((1 - abs2(g)) * acf[begin])
+    # ref[begin] = g
+    for t in 2:p
+        g = -(acf[begin+t] + a[2:t] ⋅ acf[begin+t-1:-1:begin+1]) / v
+        @. buf[2:t] = g * conj(a[t:-1:2])
+        @. a[2:t] += buf[2:t]
+        a[t+1] = g
+        v *= 1 - abs2(g)
+        # ref[t] = g
+    end
+    a, v
 end
 
 function levinson(acf::AbstractMatrix{<:Number}, p::Integer)
     nr, nc = size(acf)
     a = zeros(p + 1, nc)
-    v = zeros(p + 1, nc)
+    v = zeros(1, nc)
     for i in axes(acf, 2)
         a_i, v_i = levinson(view(acf, :, i), p)
         a[:, i] = a_i
-        v[:, i] .= v_i
+        v[i] = v_i
     end
     return a, v
 end
