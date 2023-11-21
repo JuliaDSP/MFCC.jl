@@ -286,37 +286,22 @@ end
 ## "You are welcome to move my octave code from GPL to MIT like core Julia."
 ## untested
 ## only returns a, v
-@views function levinson(acf::AbstractVector{<:Number}, p::Int)
+function levinson(acf::AbstractVector{<:Number}, p::Int)
     if isempty(acf)
         throw(ArgumentError("Empty autocorrelation function"))
     elseif p < 0
         throw(DomainError(p, "Negative model order"))
-    elseif p < 100
-        a, v = _levinson_small(acf, p)
     else
-        a, v = _levinson_large(acf, p)
+        a, v = _durbin_levinson(acf, p)
     end
     return a, v
-end
-
-"""
-Direct solution [O(p^3), but no loops so slightly faster for small p]
-## Kay & Marple Eqn (2.39)
-"""
-@views function _levinson_small(acf::AbstractVector{<:Number}, p::Int)
-    R = toeplitz(acf[begin:begin+p-1])
-    a = R \ acf[begin+1:begin+p]
-    @. a = -a
-    pushfirst!(a, 1)
-    v = real(dot(acf[begin:begin+p], a))
-    a, v
 end
 
 """
 Durbin-Levinson [O(p^2), so significantly faster for large p]
 ## Kay & Marple Eqns (2.42-2.46)
 """
-@views function _levinson_large(acf::AbstractVector{<:Number}, p::Int)
+@views function _durbin_levinson(acf::AbstractVector{<:Number}, p::Int)
     g = -acf[begin+1] / acf[begin]
     a = zeros(p + 1); a[1] = 1; a[2] = g
     buf = similar(a)
@@ -343,25 +328,4 @@ function levinson(acf::AbstractMatrix{<:Number}, p::Integer)
         v[i] = v_i
     end
     return a, v
-end
-
-## Freely after octave's implementation, ver 3.2.4, by jwe && jh
-## toeplitz(c) is Hermitian with column c
-## skipped sparse implementation
-function toeplitz(c::AbstractVector{T}, r::AbstractVector{V}=conj(c)) where {T, V <: Number}
-    nc = length(c)
-    nr = length(r)
-    res = Matrix{promote_type(T, V)}(undef, nc, nr)
-    if iszero(nc) || iszero(nr)
-        return res
-    end
-    if first(r) != first(c)
-        @warn "First elements of a Toeplitz matrix should be equal."
-    end
-    ## if issparse(c) && ispsparse(r)
-    data = [r[end:-1:begin+1]; c]
-    for j in axes(res, 2), i in axes(res, 1)
-        res[i, j] = data[nr-j+i]
-    end
-    return res
 end
