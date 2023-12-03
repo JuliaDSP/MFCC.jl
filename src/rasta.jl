@@ -23,7 +23,7 @@ function powspec(x::AbstractVector{<:AbstractFloat}, sr::Real=8000.0;
     noverlap = nwin - nstep
 
     y = spectrogram(x .* (1<<15), nwin, noverlap, nfft=nfft, fs=sr, window=window, onesided=true).power
-    ## for compability with previous specgram method, remove the last frequency and scale
+    ## for compatibility with previous specgram method, remove the last frequency and scale
     y = y[begin:end-1, :]   ##  * sumabs2(window) * sr / 2
     y .+= dither * nwin / (sum(abs2, window) * sr / 2) ## OK with julia 0.5, 0.6 interpretation as broadcast!
 
@@ -308,7 +308,7 @@ Durbin-Levinson [O(p^2), so significantly faster for large p]
     v = real((1 - abs2(g)) * acf[begin])
     # ref[begin] = g
     for t in 2:p
-        g = -(acf[begin+t] + a[2:t] ⋅ acf[begin+t-1:-1:begin+1]) / v
+        g = -(acf[begin+t] + simple_dot(a[2:t], acf[begin+t-1:-1:begin+1])) / v
         @. buf[2:t] = g * conj(a[t:-1:2])
         @. a[2:t] += buf[2:t]
         a[t+1] = g
@@ -316,6 +316,15 @@ Durbin-Levinson [O(p^2), so significantly faster for large p]
         # ref[t] = g
     end
     a, v
+end
+
+# for 1.6 compat (BLAS negative stride views bug)
+function simple_dot(x::AbstractVector{T}, y::AbstractVector{V}) where {T,V}
+    val = zero(promote_type(T, V))
+    for i in eachindex(x, y)
+        val += x[i] * y[i]
+    end
+    val
 end
 
 function levinson(acf::AbstractMatrix{<:Number}, p::Integer)
