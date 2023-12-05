@@ -50,7 +50,7 @@ function mfcc(x::AbstractVector{T}, sr::Real=16000.0; wintime=0.025, steptime=0.
     return (cepstra, pspec', meta)
 end
 
-mfcc(x::AbstractMatrix{<:AbstractFloat}, args...; kwargs...) = @distributed (tuple) for i in axes(x, 2) mfcc(x[:, i], args...; kwargs...) end
+mfcc(x::AbstractMatrix{<:AbstractFloat}, args...; kwargs...) = @distributed (vcat) for i in axes(x, 2) mfcc(x[:, i], args...; kwargs...) end
 
 
 ## default feature configurations, :rasta, :htk, :spkid_toolkit, :wbspeaker
@@ -87,8 +87,12 @@ function deltas(x::AbstractMatrix{T}, w::Integer=9) where {T<:AbstractFloat}
     return delta_v
 end
 
-sortperm_along(a::AbstractArray, dim::Integer) =
-(v=similar(a, Int, size(a, dim)); mapslices(x->sortperm!(v, x), a; dims=dim))
+function sortperm_along(a::AbstractArray, dim::Integer)
+    v = similar(a, Int, size(a, dim))
+    scr = similar(v)
+    kw = VERSION >= v"1.9" ? (; scratch=scr) : (;)
+    mapslices(x -> sortperm!(v, x; kw...), a; dims=dim)
+end
 
 @memoize Dict erfinvtab(wl::Integer) = @. √2 * erfinv(2(1:wl) / (wl + 1) - 1)
 
@@ -140,10 +144,9 @@ function znorm!(x::AbstractArray, dim::Integer=1)
 end
 
 ## short-term mean and variance normalization
-function stmvn(x::AbstractVector{T}, w::Integer=399) where T
-    y = similar(x, promote_type(Float64, T))
+function stmvn!(out, x::AbstractVector{T}, w::Integer=399) where T
     nx = length(x)
-    nx ≤ 1 || w <= 1 && return copy!(y, x)
+    nx ≤ 1 || w <= 1 && return copy!(out, x)
     hw = w ÷ 2 ## effectively makes `w` odd...
     len_w = min(nx, hw + 1)
     v = Iterators.take(x, len_w)
@@ -154,19 +157,21 @@ function stmvn(x::AbstractVector{T}, w::Integer=399) where T
         sx += (hw + 1 - nx) * last(x)
         sxx += (hw + 1 - nx) * last(x)^2
     end
-    for i in eachindex(x, y)
+    for i in eachindex(x, out)
         μ = sx / w
         σ = sqrt((sxx - μ * sx) / (w - 1))
-        y[i] = (x[i] - μ) / σ
+        out[i] = (x[i] - μ) / σ
         mi = max(i - hw, firstindex(x))
         ma = min(i + hw + 1, lastindex(x))
         sx += x[ma] - x[mi]
         sxx += x[ma]^2 - x[mi]^2
     end
-    return y
+    return out
 end
 
-stmvn(m::AbstractMatrix, w::Integer=399, dim::Integer=1) = mapslices(x->stmvn(x, w), m; dims=dim)
+stmvn(x::AbstractVector{T}, w::Integer=399) where T = stmvn!(similar(x, promote_type(Float64, T)), x, w)
+stmvn(m::AbstractMatrix{T}, w::Integer=399, dim::Integer=1) where T =
+    (out = similar(m, promote_type(Float64, T), axes(m, 1)); mapslices(x -> stmvn!(out, x, w), m; dims=dim))
 
 ## Shifted Delta Coefficients by copying
 function sdc(x::AbstractMatrix{T}, n::Integer=7, d::Integer=1, p::Integer=3, k::Integer=7) where {T<:AbstractFloat}

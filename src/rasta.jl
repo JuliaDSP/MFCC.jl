@@ -23,7 +23,7 @@ function powspec(x::AbstractVector{<:AbstractFloat}, sr::Real=8000.0;
     noverlap = nwin - nstep
 
     y = spectrogram(x .* (1<<15), nwin, noverlap, nfft=nfft, fs=sr, window=window, onesided=true).power
-    ## for compability with previous specgram method, remove the last frequency and scale
+    ## for compatibility with previous specgram method, remove the last frequency and scale
     y = y[begin:end-1, :]   ##  * sumabs2(window) * sr / 2
     y .+= dither * nwin / (sum(abs2, window) * sr / 2) ## OK with julia 0.5, 0.6 interpretation as broadcast!
 
@@ -282,73 +282,59 @@ function lifter(x::AbstractArray{<:AbstractFloat}, lift::Real=0.6, invs::Bool=fa
 end
 
 ## Freely after octave's implementation, by Paul Kienzle <pkienzle@users.sf.net>
-## Permission granted to usee this in a MIT license on 20 dec 2013 by the author Paul Kienzle:
+## Permission granted to use this in a MIT license on 20 dec 2013 by the author Paul Kienzle:
 ## "You are welcome to move my octave code from GPL to MIT like core Julia."
 ## untested
 ## only returns a, v
-@views function levinson(acf::AbstractVector{<:Number}, p::Int)
+function levinson(acf::AbstractVector{<:Number}, p::Int)
     if isempty(acf)
         throw(ArgumentError("Empty autocorrelation function"))
     elseif p < 0
         throw(DomainError(p, "Negative model order"))
-    elseif p < 100
-        ## direct solution [O(p^3), but no loops so slightly faster for small p]
-        ## Kay & Marple Eqn (2.39)
-        R = toeplitz(acf[begin:begin+p-1])
-        a = R \ acf[begin+1:begin+p]
-        @. a = -a
-        pushfirst!(a, 1)
-        v = @. real(a*conj(acf[begin:begin+p]))
     else
-        ## durbin-levinson [O(p^2), so significantly faster for large p]
-        ## Kay & Marple Eqns (2.42-2.46)
-        # ref = zeros(p)
-        g = -acf[begin+1] / acf[begin]
-        a = zeros(p+1); a[1] = 1; a[2] = g
-        buf = similar(a)
-        v = real((1 - abs2(g)) * acf[begin])
-        # ref[begin] = g  # is not used???
-        for t in 2:p
-            g = -(acf[begin+t] + a[2:t] ⋅ acf[begin+t-1:-1:begin+1]) / v
-            @. buf[2:t] = g * conj(a[t:-1:2])
-            @. a[2:t] += buf[2:t]
-            a[t+1] = g
-            v *= 1 - abs2(g)
-            # ref[t] = g
-        end
+        a, v = _durbin_levinson(acf, p)
     end
     return a, v
+end
+
+"""
+Durbin-Levinson [O(p^2), so significantly faster for large p]
+## Kay & Marple Eqns (2.42-2.46)
+"""
+@views function _durbin_levinson(acf::AbstractVector{<:Number}, p::Int)
+    g = -acf[begin+1] / acf[begin]
+    a = zeros(p + 1); a[1] = 1; a[2] = g
+    buf = similar(a)
+    v = real((1 - abs2(g)) * acf[begin])
+    # ref[begin] = g
+    for t in 2:p
+        g = -(acf[begin+t] + simple_dot(a[2:t], acf[begin+t-1:-1:begin+1])) / v
+        @. buf[2:t] = g * conj(a[t:-1:2])
+        @. a[2:t] += buf[2:t]
+        a[t+1] = g
+        v *= 1 - abs2(g)
+        # ref[t] = g
+    end
+    a, v
+end
+
+# for 1.6 compat (BLAS negative stride views bug)
+function simple_dot(x::AbstractVector{T}, y::AbstractVector{V}) where {T,V}
+    val = zero(promote_type(T, V))
+    for i in eachindex(x, y)
+        val += x[i] * y[i]
+    end
+    val
 end
 
 function levinson(acf::AbstractMatrix{<:Number}, p::Integer)
     nr, nc = size(acf)
     a = zeros(p + 1, nc)
-    v = zeros(p + 1, nc)
+    v = zeros(1, nc)
     for i in axes(acf, 2)
         a_i, v_i = levinson(view(acf, :, i), p)
         a[:, i] = a_i
-        v[:, i] .= v_i
+        v[i] = v_i
     end
     return a, v
-end
-
-## Freely after octave's implementation, ver 3.2.4, by jwe && jh
-## toeplitz(c) is Hermitian with column c
-## skipped sparse implementation
-function toeplitz(c::AbstractVector{T}, r::AbstractVector{V}=conj(c)) where {T, V <: Number}
-    nc = length(c)
-    nr = length(r)
-    res = Matrix{promote_type(T, V)}(undef, nc, nr)
-    if iszero(nc) || iszero(nr)
-        return res
-    end
-    if first(r) != first(c)
-        @warn "First elements of a Toeplitz matrix should be equal."
-    end
-    ## if issparse(c) && ispsparse(r)
-    data = [r[end:-1:begin+1]; c]
-    for j in axes(res, 2), i in axes(res, 1)
-        res[i, j] = data[nr-j+i]
-    end
-    return res
 end
