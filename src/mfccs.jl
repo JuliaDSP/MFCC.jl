@@ -90,7 +90,8 @@ end
 function sortperm_along(a::AbstractArray, dim::Integer)
     v = similar(a, Int, size(a, dim))
     scr = similar(v)
-    mapslices(x -> sortperm!(v, x; scratch=scr), a; dims=dim)
+    kw = VERSION >= v"1.9" ? (; scratch=scr) : (;)
+    mapslices(x -> sortperm!(v, x; kw...), a; dims=dim)
 end
 
 @memoize Dict erfinvtab(wl::Integer) = @. √2 * erfinv(2(1:wl) / (wl + 1) - 1)
