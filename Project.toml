@@ -19,7 +19,7 @@ WAV = "8149f6b0-98f6-5db9-b78f-408fbbb8ef88"
 
 [compat]
 Compat = "3.44, 4"
-DSP = "0.6, 0.7"
+DSP = "0.6, 0.7, 0.8"
 Distributed = "1"
 FFTW = "1"
 FileIO = "1"
