@@ -16,11 +16,11 @@ jobs:
       matrix:
         julia-version:
           - '1'
-        julia-arch: [x64]
+        julia-arch:
+          - x64
         os:
           - ubuntu-latest
           - windows-latest
-          
         include:
           - os: macOS-latest
             julia-arch: aarch64
@@ -30,7 +30,8 @@ jobs:
             julia-version: '1.6'
           - os: ubuntu-latest
             julia-arch: x64
-            julia-version: 'pre'
+            julia-version: 'nightly'
+
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@latest
